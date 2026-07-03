@@ -1,0 +1,22 @@
+if (NOT DEFINED SRC_DIR OR NOT DEFINED DST_DIR)
+    message(FATAL_ERROR "copy_runtime_dir.cmake requires SRC_DIR and DST_DIR")
+endif()
+
+if (NOT EXISTS "${SRC_DIR}")
+    message(WARNING "Runtime directory does not exist: ${SRC_DIR}")
+    return()
+endif()
+
+file(MAKE_DIRECTORY "${DST_DIR}")
+file(GLOB_RECURSE RUNTIME_FILES LIST_DIRECTORIES false RELATIVE "${SRC_DIR}" "${SRC_DIR}/*")
+
+foreach (REL_PATH IN LISTS RUNTIME_FILES)
+    set(SRC_FILE "${SRC_DIR}/${REL_PATH}")
+    set(DST_FILE "${DST_DIR}/${REL_PATH}")
+    get_filename_component(DST_PARENT "${DST_FILE}" DIRECTORY)
+    file(MAKE_DIRECTORY "${DST_PARENT}")
+    file(COPY_FILE "${SRC_FILE}" "${DST_FILE}" ONLY_IF_DIFFERENT RESULT COPY_RESULT)
+    if (NOT COPY_RESULT STREQUAL "0")
+        message(WARNING "Could not copy runtime file: ${SRC_FILE} -> ${DST_FILE}: ${COPY_RESULT}")
+    endif()
+endforeach()

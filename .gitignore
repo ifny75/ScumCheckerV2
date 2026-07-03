@@ -1,0 +1,15 @@
+build/
+build-vs2022/
+out/
+third_party/
+.vs/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.user
+*.suo
+*.vcxproj.user
+*.log
+*.obj
+*.lib
+*.exp

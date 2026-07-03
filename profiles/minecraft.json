@@ -1,0 +1,15 @@
+{
+  "id": "minecraft",
+  "name": "Minecraft",
+  "status": "soon",
+  "description": "Minecraft profile is planned; scanner rules are not enabled yet.",
+  "strings": [
+    "minecraft",
+    "javaw"
+  ],
+  "paths": [
+    "\\.minecraft\\",
+    "\\minecraft\\"
+  ],
+  "hashes": []
+}

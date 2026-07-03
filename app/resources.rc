@@ -1,0 +1,32 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#include <windows.h>
+
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_APP_ICON            ICON                    "../Checker.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Embedded KSystemInformer drivers (signed .sys), extracted to %TEMP% at runtime.
+//
+
+IDR_DRIVER_AMD64        RCDATA                  "../drivers/amd64/systeminformer.sys"
+IDR_DRIVER_ARM64        RCDATA                  "../drivers/arm64/systeminformer.sys"
+
+#endif    // English (United States) resources
+/////////////////////////////////////////////////////////////////////////////

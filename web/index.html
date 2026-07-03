@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScumCheckerV2</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="picker" id="picker">
+    <canvas class="shader-canvas" id="shaderCanvas" aria-hidden="true"></canvas>
+    <div class="picker-frame" aria-hidden="true"></div>
+    <header class="picker-head">
+      <h1>Select game for check</h1>
+    </header>
+    <section class="game-grid" id="gameGrid"></section>
+    <aside class="support-badge">
+      <img src="./assets/checker.png" alt="">
+      <div>
+        <strong>ScumCheckerV2</strong>
+        <span>with the support</span>
+        <span>of astryxguard</span>
+      </div>
+    </aside>
+  </main>
+
+  <main class="app hidden" id="appShell">
+    <canvas class="app-shader-canvas" id="appShaderCanvas" aria-hidden="true"></canvas>
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="./assets/scum.png" alt="" class="brand-icon" id="activeGameIcon">
+        <div>
+          <h1>ScumCheckerV2</h1>
+          <p id="activeGameName">SCUM</p>
+        </div>
+      </div>
+
+      <button class="back-button" id="changeGameButton" type="button">← <span data-i18n="nav.profiles">Профили</span></button>
+
+      <nav class="nav">
+        <button class="nav-button" data-page="astryx" type="button"><img src="./assets/svg/layers.svg" alt=""><span data-i18n="nav.astryx">AstryxView</span></button>
+        <button class="nav-button active" data-page="dashboard" type="button"><img src="./assets/svg/target-audience.svg" alt=""><span data-i18n="nav.dashboard">Dashboard</span></button>
+        <button class="nav-button" data-page="findings" type="button"><img src="./assets/svg/data-encryption.svg" alt=""><span data-i18n="nav.findings">Findings</span></button>
+        <button class="nav-button" data-page="steam" type="button"><img src="./assets/svg/svgviewer-output.svg" alt=""><span data-i18n="nav.steam">Steam аккаунты</span></button>
+        <button class="nav-button" data-page="history" data-profiles="scum" type="button"><img src="./assets/svg/time-past.svg" alt=""><span data-i18n="nav.history">История</span></button>
+        <button class="nav-button" data-page="dma" data-profiles="scum" type="button"><img src="./assets/svg/network.svg" alt=""><span data-i18n="nav.dma">DMA & Network</span></button>
+        <button class="nav-button" data-page="seccfg" type="button"><img src="./assets/svg/lock-open-alt.svg" alt=""><span data-i18n="nav.seccfg">Security config</span></button>
+        <button class="nav-button" data-page="tools" type="button"><img src="./assets/svg/allen-keys.svg" alt=""><span data-i18n="nav.tools">Tools</span></button>
+        <button class="nav-button" data-page="hotkeys" type="button"><img src="./assets/svg/keyboard.svg" alt=""><span data-i18n="nav.hotkeys">Hotkeys</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="lang-switch" id="langSwitch">
+          <button type="button" class="lang-btn" data-lang="ru">RU</button>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+        </div>
+        <div class="admin-state" id="adminState">Admin: checking...</div>
+        <div class="creator">
+          <img src="./assets/checker.png" alt="">
+          <div>
+            <strong>Creator</strong>
+            <a data-open="https://e-z.bio/ifny" href="#">e-z.bio/ifny</a>
+            <a data-open="https://astryxclient.com/" href="#">astryxclient.com</a>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow" id="profileStatus">SCUM profile</div>
+          <h2 id="screenTitle">Native check dashboard</h2>
+        </div>
+        <button class="primary scan-action" id="scanButton" data-mode="full" type="button">
+          <span class="button-icon">▶</span>
+          <span>Full scan</span>
+        </button>
+      </header>
+
+      <section class="scan-strip">
+        <div class="status-strip" id="statusStrip">Waiting for WebView bridge...</div>
+        <div class="scan-progress" id="scanProgress">
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+        <div class="progress-line">
+          <span id="progressStage">Idle</span>
+          <strong id="progressPercent">0%</strong>
+        </div>
+      </section>
+
+      <section class="page active" id="page-dashboard">
+        <section class="action-grid">
+          <button class="action-card scan-action" data-mode="full" type="button">
+            <img src="./assets/icons/icon_scan.png" alt="">
+            <span>Full native scan</span>
+            <small>Processes, files, drivers, Steam, history</small>
+          </button>
+          <button class="action-card scan-action" data-mode="kernel" type="button">
+            <img src="./assets/icons/icon_native.png" alt="">
+            <span>Kernel SYS scan</span>
+            <small>KSystemInformer, live handles, driver cross-check</small>
+          </button>
+          <button class="action-card scan-action" data-mode="steam" type="button">
+            <img src="./assets/icons/icon_steam.png" alt="">
+            <span>Refresh Steam</span>
+            <small>loginusers.vdf accounts</small>
+          </button>
+          <button class="action-card scan-action" data-mode="history" data-profiles="scum" type="button">
+            <img src="./assets/icons/usbdrivelog_ico.png" alt="">
+            <span>Refresh History</span>
+            <small>USB, BAM/DAM, devices</small>
+          </button>
+          <button class="action-card scan-action" data-mode="dma" data-profiles="scum" type="button">
+            <img src="./assets/icons/icon_path.png" alt="">
+            <span>DMA / Network</span>
+            <small>PCIe, connections, ARP</small>
+          </button>
+          <button class="action-card scan-action" data-mode="seccfg" type="button">
+            <img src="./assets/icons/icon_native.png" alt="">
+            <span>Security config</span>
+            <small>Secure Boot, DSE, Defender, HVCI</small>
+          </button>
+        </section>
+
+        <section class="stats-grid">
+          <article class="stat"><span>Findings</span><strong id="statFindings">0</strong></article>
+          <article class="stat"><span>Processes</span><strong id="statProcesses">0</strong></article>
+          <article class="stat"><span>Drivers</span><strong id="statDrivers">0</strong></article>
+          <article class="stat"><span>Elapsed</span><strong id="statElapsed">0 ms</strong></article>
+        </section>
+
+        <section class="dashboard-grid">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>High priority</h3>
+              <span id="highCount">0</span>
+            </div>
+            <div id="highList" class="compact-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Steam summary</h3>
+              <span id="steamCount">0</span>
+            </div>
+            <div id="steamSummary" class="compact-list"></div>
+          </article>
+        </section>
+      </section>
+
+      <section class="page page-astryx" id="page-astryx">
+        <div class="astryx-shell">
+          <header class="astryx-hero">
+            <div>
+              <h3>AstryxView</h3>
+              <p data-i18n="astryx.subtitle">Tries to understand user behavior signatures</p>
+            </div>
+            <button class="secondary scan-action" data-mode="full" type="button" data-i18n="astryx.analyze">Analyze</button>
+          </header>
+
+          <section class="astryx-board">
+            <svg class="astryx-lines" id="astryxLines" viewBox="0 0 1200 620" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <div class="astryx-node root" id="astryxRootNode"></div>
+            <div class="astryx-graph" id="astryxGraph"></div>
+          </section>
+
+          <footer class="astryx-footer">
+            <div class="astryx-progress">
+              <div class="astryx-progress-fill" id="astryxProgressFill"></div>
+            </div>
+            <strong id="astryxProgressText">0%</strong>
+            <span id="astryxStatus">waiting.... Please run scan!</span>
+          </footer>
+        </div>
+      </section>
+
+      <section class="page" id="page-findings">
+        <div class="results-head">
+          <h3>Findings</h3>
+          <div class="head-tools">
+            <input class="search-input" id="findingsSearch" type="search" placeholder="Search detections...">
+            <button class="secondary" id="findingsFilterButton" type="button">Filter</button>
+            <div class="filter-panel" id="findingsFilterPanel">
+              <div class="filter-panel-head">
+                <strong>Filters</strong>
+                <button class="mini-button" id="findingsFilterClose" type="button">Close</button>
+              </div>
+              <div class="filter-tabs">
+              <button class="tab active" data-filter="all" type="button">All</button>
+              <button class="tab" data-filter="3" type="button">High</button>
+              <button class="tab" data-filter="2" type="button">Medium</button>
+              <button class="tab" data-filter="1" type="button">Low</button>
+              <button class="tab" data-filter="system-signed" type="button">System signed</button>
+              <button class="tab" data-filter="system-unsigned" type="button">System unsigned</button>
+              <button class="tab" data-filter="leaked-cert" type="button">Leaked cert</button>
+              <button class="tab" data-filter="test-mode" type="button">Test mode</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="pagination-bar" id="findingsPagination"></div>
+        <div id="resultsList" class="results-list">
+          <div class="empty-state">Run a profile scan to see findings here.</div>
+        </div>
+      </section>
+
+      <section class="page" id="page-steam">
+        <div class="section-head">
+          <div>
+            <h3>Steam аккаунты</h3>
+            <p>Аккаунты из Steam/config/loginusers.vdf. Двойной клик по карточке открывает профиль.</p>
+          </div>
+          <div class="head-tools">
+            <input class="search-input" id="steamSearch" type="search" placeholder="Search Steam...">
+            <div class="view-toggle">
+              <button class="view-button active" data-steam-view="cards" type="button">Cards</button>
+              <button class="view-button" data-steam-view="grid" type="button">Grid</button>
+            </div>
+            <button class="secondary scan-action" data-mode="steam" type="button">Refresh Steam</button>
+          </div>
+        </div>
+        <div id="steamCards" class="steam-grid"></div>
+      </section>
+
+      <section class="page" id="page-history">
+        <div class="section-head">
+          <div>
+            <h3>История системы</h3>
+            <p>USB, BAM/DAM запуск программ, device bus и рядом лежащие следы.</p>
+          </div>
+          <div class="head-tools">
+            <input class="search-input" id="historySearch" type="search" placeholder="Search history...">
+            <button class="secondary scan-action" data-mode="history" data-profiles="scum" type="button">Refresh History</button>
+          </div>
+        </div>
+        <div id="historyTable" class="table"></div>
+      </section>
+
+      <section class="page" id="page-dma">
+        <div class="section-head">
+          <div>
+            <h3>DMA & Network</h3>
+            <p>PCIe устройства, FPGA/DMA риск, активные соединения и ARP-соседи.</p>
+          </div>
+          <div class="head-tools">
+            <input class="search-input" id="dmaSearch" type="search" placeholder="Search DMA/network...">
+            <button class="secondary scan-action" data-mode="dma" data-profiles="scum" type="button">Refresh DMA</button>
+          </div>
+        </div>
+        <div id="dmaTable" class="table"></div>
+      </section>
+
+      <section class="page" id="page-seccfg">
+        <div class="section-head">
+          <div>
+            <h3>Security configuration</h3>
+            <p>Secure Boot, driver signature enforcement (DSE/test-signing), kernel debug, Defender, VBS/HVCI и blocklist уязвимых драйверов.</p>
+          </div>
+          <div class="head-tools">
+            <input class="search-input" id="seccfgSearch" type="search" placeholder="Search security config...">
+            <button class="secondary scan-action" data-mode="seccfg" type="button">Refresh config</button>
+          </div>
+        </div>
+        <div id="seccfgTable" class="table"></div>
+      </section>
+
+      <section class="page" id="page-tools">
+        <div class="section-head">
+          <div>
+            <h3>Tools</h3>
+            <p>Быстрые переходы к системным местам, как в старой C# версии.</p>
+          </div>
+          <input class="search-input" id="toolsSearch" type="search" placeholder="Search tools...">
+        </div>
+        <div class="tool-grid">
+          <button class="tool-button" data-open="steam_loginusers" type="button"><img src="./assets/icons/ico_steam.png" alt="">Steam loginusers.vdf</button>
+          <button class="tool-button" data-open="prefetch" type="button"><img src="./assets/icons/ico_prefetch.png" alt="">Prefetch</button>
+          <button class="tool-button" data-open="recent" type="button"><img src="./assets/icons/ico_recent.png" alt="">Recent files</button>
+          <button class="tool-button" data-open="appdata" type="button"><img src="./assets/icons/ico_appdata.png" alt="">AppData</button>
+          <button class="tool-button" data-open="localappdata" type="button"><img src="./assets/icons/ico_temp.png" alt="">LocalAppData</button>
+          <button class="tool-button" data-open="eventvwr" type="button"><img src="./assets/icons/ico_eventlog.png" alt="">Event Viewer</button>
+          <button class="tool-button" data-open="downloads" type="button"><img src="./assets/icons/ico_downloads.png" alt="">Downloads</button>
+          <button class="tool-button" data-open="desktop" type="button"><img src="./assets/icons/ico_desktop.png" alt="">Desktop</button>
+          <button class="tool-button" data-open="temp" type="button"><img src="./assets/icons/ico_temp.png" alt="">Temp</button>
+          <button class="tool-button" data-open="programdata" type="button"><img src="./assets/icons/ico_appdata.png" alt="">ProgramData</button>
+          <button class="tool-button" data-open="chrome_history" type="button"><img src="./assets/icons/ico_chrome.png" alt="">Chrome user data</button>
+          <button class="tool-button" data-open="edge_history" type="button"><img src="./assets/icons/ico_edge.png" alt="">Edge user data</button>
+          <button class="tool-button" data-open="everything" type="button"><img src="./assets/icons/everything_ico.png" alt="">Everything</button>
+          <button class="tool-button" data-open="lastactivity" type="button"><img src="./assets/icons/lastactivityview_ico.png" alt="">LastActivityView</button>
+          <button class="tool-button" data-open="executedprograms" type="button"><img src="./assets/icons/executedprogramslist_ico.png" alt="">ExecutedProgramsList</button>
+          <button class="tool-button" data-open="cachedprograms" type="button"><img src="./assets/icons/cacheprogramlist_ico.png" alt="">CachedProgramsList</button>
+          <button class="tool-button" data-open="journaltrace" type="button"><img src="./assets/icons/JournalTrace_ico.png" alt="">JournalTrace</button>
+          <button class="tool-button" data-open="usbdeview" type="button"><img src="./assets/icons/usbdeview_ico.png" alt="">USBDeview</button>
+          <button class="tool-button" data-open="usbdrivelog" type="button"><img src="./assets/icons/usbdrivelog_ico.png" alt="">USBDriveLog</button>
+          <button class="tool-button" data-open="shellbags" type="button"><img src="./assets/icons/Shellbag_ico.png" alt="">ShellBags</button>
+        </div>
+      </section>
+
+      <section class="page" id="page-hotkeys">
+        <div class="section-head">
+          <div>
+            <h3>Hotkeys / paths</h3>
+            <p>Быстрые страницы для проверки читов, автозагрузок, реестра и системных следов.</p>
+          </div>
+          <input class="search-input" id="hotkeysSearch" type="search" placeholder="Search hotkeys...">
+        </div>
+        <div class="tool-grid">
+          <button class="tool-button hotkey-button" data-open="regedit" type="button"><img src="./assets/icons/ico_reg.png" alt="">Registry</button>
+          <button class="tool-button hotkey-button" data-open="registry_run" type="button"><img src="./assets/icons/ico_reg.png" alt="">Run keys</button>
+          <button class="tool-button hotkey-button" data-open="startup" type="button"><img src="./assets/icons/ico_winupdate.png" alt="">Startup folder</button>
+          <button class="tool-button hotkey-button" data-open="taskschd" type="button"><img src="./assets/icons/ico_eventlog.png" alt="">Task Scheduler</button>
+          <button class="tool-button hotkey-button" data-open="services" type="button"><img src="./assets/icons/icon_native.png" alt="">Services</button>
+          <button class="tool-button hotkey-button" data-open="taskmgr" type="button"><img src="./assets/icons/executedprogramslist_ico.png" alt="">Task Manager</button>
+          <button class="tool-button hotkey-button" data-open="drivers_dir" type="button"><img src="./assets/icons/icon_native.png" alt="">Drivers directory</button>
+          <button class="tool-button hotkey-button" data-open="hosts" type="button"><img src="./assets/icons/icon_path.png" alt="">Hosts file</button>
+          <button class="tool-button hotkey-button" data-open="firewall" type="button"><img src="./assets/icons/ico_eventlog.png" alt="">Firewall</button>
+          <button class="tool-button hotkey-button" data-open="installed_apps" type="button"><img src="./assets/icons/icon_tools.png" alt="">Installed apps</button>
+          <button class="tool-button hotkey-button" data-open="device_manager" type="button"><img src="./assets/icons/icon_path.png" alt="">Device Manager</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

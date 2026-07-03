@@ -1,0 +1,16 @@
+{
+  "id": "cs",
+  "name": "CS",
+  "status": "soon",
+  "description": "Path writes as soon... no CS cheat samples are available for checker rules yet.",
+  "strings": [
+    "cs2",
+    "counter-strike"
+  ],
+  "paths": [
+    "\\counter-strike global offensive\\",
+    "\\cs2\\"
+  ],
+  "hashes": []
+}
+
