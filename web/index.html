@@ -222,6 +222,12 @@
             <button class="secondary scan-action" data-mode="history" data-profiles="scum" type="button">Refresh History</button>
           </div>
         </div>
+        <div class="history-tabs" role="group" aria-label="Разделы истории">
+          <button class="history-tab active" data-history-category="all" aria-pressed="true" type="button">Все <span data-history-count="all">0</span></button>
+          <button class="history-tab" data-history-category="UsbHistory" aria-pressed="false" type="button">USB <span data-history-count="UsbHistory">0</span></button>
+          <button class="history-tab" data-history-category="ExecHistory" aria-pressed="false" type="button">Запуски программ <span data-history-count="ExecHistory">0</span></button>
+          <button class="history-tab" data-history-category="DeviceHistory" aria-pressed="false" type="button">Устройства <span data-history-count="DeviceHistory">0</span></button>
+        </div>
         <div id="historyTable" class="table"></div>
       </section>
 

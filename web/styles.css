@@ -2544,3 +2544,52 @@ input { font: inherit; }
 .scan-report-row > div { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .scan-report-row strong { font-weight: 500; color: var(--text); }
 .scan-report-row ul { margin: 3px 0 0; padding-left: 16px; }
+
+/* Content-sized cards and controls for windowed layouts. */
+#page-steam { grid-template-rows: auto minmax(0, 1fr); }
+#page-history { grid-template-rows: auto auto minmax(0, 1fr); }
+.section-head { min-width: 0; flex-wrap: wrap; }
+.section-head > div, .head-tools { min-width: 0; }
+.head-tools { flex-wrap: wrap; }
+.search-input { min-width: 0; max-width: 100%; }
+.steam-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  align-items: start;
+  gap: 12px;
+}
+.steam-card {
+  min-width: 0;
+  min-height: min-content;
+  height: auto;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+}
+.steam-card-head > div, .steam-info-lines { min-width: 0; }
+.steam-card h4, .steam-card p { overflow-wrap: anywhere; white-space: normal; }
+.steam-card p { margin: 0; line-height: 1.45; }
+.steam-grid.grid-mode .steam-card {
+  grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+.steam-grid.grid-mode .steam-card-head { display: flex; }
+.finding, .table-row, .action-card, .tool-button { min-width: 0; overflow-wrap: anywhere; }
+.history-tabs { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 12px; }
+.history-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: 7px;
+  color: var(--muted); background: rgba(255,255,255,.04); cursor: pointer;
+}
+.history-tab.active { color: var(--text); border-color: var(--accent); background: rgba(var(--accent-rgb), .12); }
+.history-tab span { padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.08); font-size: 11px; }
+.history-flow { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+@media (max-width: 1100px) {
+  .steam-grid.grid-mode .steam-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .steam-grid.grid-mode .steam-card { grid-template-columns: minmax(0, 1fr); }
+}

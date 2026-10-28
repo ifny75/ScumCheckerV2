@@ -3,6 +3,7 @@ const state = {
   activeProfile: null,
   activeFilter: "all",
   activePage: "dashboard",
+  historyCategory: "all",
   findingsPageIndex: 0,
   findingsPageSize: 100,
   findingsFiltersOpen: false,
@@ -637,7 +638,7 @@ function renderHistoryFlow(container, rows, emptyText) {
     return;
   }
 
-  const limited = rows.slice(-36);
+  const limited = rows;
   container.innerHTML = `
     <div class="history-flow">
       ${limited.map((item, index) => {
@@ -783,7 +784,16 @@ function renderRows(containerId, group, emptyText) {
   const query = state.searches[group] || "";
   const rows = visibleFindings()
     .filter(item => categoryGroup(item.category) === group)
-    .filter(item => findingMatches(item, query));
+    .filter(item => findingMatches(item, query))
+    .filter(item => group !== "history" || state.historyCategory === "all" || item.category === state.historyCategory);
+  if (group === "history") {
+    const history = visibleFindings().filter(item => categoryGroup(item.category) === "history");
+    document.querySelectorAll("[data-history-count]").forEach(badge => {
+      const category = badge.dataset.historyCount;
+      badge.textContent = category === "all" ? history.length : history.filter(item => item.category === category).length;
+    });
+    if (history.length) emptyText = "В этом разделе нет записей по вашему запросу.";
+  }
   const sortedRows = sortRowsForGroup(rows, group);
   const container = document.querySelector(containerId);
   if (!rows.length) {
@@ -1404,6 +1414,18 @@ document.querySelector("#findingsSearch").addEventListener("input", event => {
 document.querySelector("#steamSearch").addEventListener("input", event => {
   state.searches.steam = event.target.value;
   renderSteam();
+});
+
+document.querySelectorAll(".history-tab").forEach(button => {
+  button.addEventListener("click", () => {
+    state.historyCategory = button.dataset.historyCategory;
+    document.querySelectorAll(".history-tab").forEach(tab => {
+      const active = tab === button;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-pressed", String(active));
+    });
+    renderRows("#historyTable", "history", "Записи истории пока не загружены.");
+  });
 });
 
 document.querySelector("#historySearch").addEventListener("input", event => {
