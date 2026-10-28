@@ -1446,15 +1446,20 @@ document.querySelector("#seccfgSearch").addEventListener("input", event => {
 document.querySelector("#toolsSearch").addEventListener("input", event => {
   state.searches.tools = event.target.value.toLowerCase();
   document.querySelectorAll("#page-tools .tool-button").forEach(button => {
-    button.style.display = button.textContent.toLowerCase().includes(state.searches.tools) ? "" : "none";
+    button.classList.toggle("hidden", !button.textContent.toLowerCase().includes(state.searches.tools));
   });
+  document.querySelector("#toolsEmpty").classList.toggle("hidden", !!document.querySelector("#page-tools .tool-button:not(.hidden)"));
 });
 
 document.querySelector("#hotkeysSearch").addEventListener("input", event => {
   state.searches.hotkeys = event.target.value.toLowerCase();
   document.querySelectorAll("#page-hotkeys .hotkey-button").forEach(button => {
-    button.style.display = button.textContent.toLowerCase().includes(state.searches.hotkeys) ? "" : "none";
+    button.classList.toggle("hidden", !button.textContent.toLowerCase().includes(state.searches.hotkeys));
   });
+  document.querySelectorAll(".shortcut-group").forEach(group => {
+    group.classList.toggle("hidden", !group.querySelector(".hotkey-button:not(.hidden)"));
+  });
+  document.querySelector("#hotkeysEmpty").classList.toggle("hidden", !!document.querySelector("#page-hotkeys .hotkey-button:not(.hidden)"));
 });
 
 // ---- i18n (RU / EN) ----------------------------------------------------------

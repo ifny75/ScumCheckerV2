@@ -2593,3 +2593,31 @@ input { font: inherit; }
 @media (max-width: 720px) {
   .steam-grid.grid-mode .steam-card { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Program launchers are rows; system shortcuts are grouped, equal-size tiles. */
+#page-tools, #page-hotkeys { grid-template-rows: auto minmax(0, 1fr); }
+.tool-list, .shortcut-sections { min-width: 0; min-height: 0; overflow: auto; padding: 12px; }
+.tool-list { display: grid; grid-auto-rows: max-content; gap: 7px; align-content: start; }
+.tool-list .tool-list-row {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) 20px;
+  width: 100%; min-height: 66px; gap: 14px; padding: 10px 14px;
+}
+.tool-list-row img { width: 28px; height: 28px; object-fit: contain; }
+.tool-list-row > span, .hotkey-button > span { min-width: 0; }
+.tool-list-row strong, .hotkey-button strong { display: block; font-size: 14px; font-weight: 500; line-height: 1.35; }
+.tool-list-row small, .hotkey-button small { display: block; margin-top: 4px; font-size: 12px; line-height: 1.35; color: var(--muted); }
+.tool-launch { color: var(--muted); text-align: right; }
+.shortcut-sections { display: grid; gap: 20px; align-content: start; }
+.shortcut-group { min-width: 0; }
+.shortcut-group h4 { margin: 0 0 9px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.shortcut-group .tool-grid {
+  padding: 0; overflow: visible;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  grid-auto-rows: 1fr; gap: 8px;
+}
+.shortcut-group .hotkey-button {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr);
+  min-height: 76px; width: 100%; height: 100%; padding: 12px; gap: 12px;
+}
+.shortcut-group .hotkey-button img { width: 25px; height: 25px; object-fit: contain; }
+.tool-list-row:hover, .hotkey-button:hover { transform: none; }

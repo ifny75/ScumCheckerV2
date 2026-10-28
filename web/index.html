@@ -260,57 +260,59 @@
       </section>
 
       <section class="page" id="page-tools">
-        <div class="section-head">
-          <div>
-            <h3>Tools</h3>
-            <p>Быстрые переходы к системным местам, как в старой C# версии.</p>
-          </div>
-          <input class="search-input" id="toolsSearch" type="search" placeholder="Search tools...">
+        <div class="section-head"><div><h3>Инструменты</h3><p>Программы для ручной проверки системы.</p></div>
+          <input class="search-input" id="toolsSearch" type="search" placeholder="Поиск программы...">
         </div>
-        <div class="tool-grid">
-          <button class="tool-button" data-open="steam_loginusers" type="button"><img src="./assets/icons/ico_steam.png" alt="">Steam loginusers.vdf</button>
-          <button class="tool-button" data-open="prefetch" type="button"><img src="./assets/icons/ico_prefetch.png" alt="">Prefetch</button>
-          <button class="tool-button" data-open="recent" type="button"><img src="./assets/icons/ico_recent.png" alt="">Recent files</button>
-          <button class="tool-button" data-open="appdata" type="button"><img src="./assets/icons/ico_appdata.png" alt="">AppData</button>
-          <button class="tool-button" data-open="localappdata" type="button"><img src="./assets/icons/ico_temp.png" alt="">LocalAppData</button>
-          <button class="tool-button" data-open="eventvwr" type="button"><img src="./assets/icons/ico_eventlog.png" alt="">Event Viewer</button>
-          <button class="tool-button" data-open="downloads" type="button"><img src="./assets/icons/ico_downloads.png" alt="">Downloads</button>
-          <button class="tool-button" data-open="desktop" type="button"><img src="./assets/icons/ico_desktop.png" alt="">Desktop</button>
-          <button class="tool-button" data-open="temp" type="button"><img src="./assets/icons/ico_temp.png" alt="">Temp</button>
-          <button class="tool-button" data-open="programdata" type="button"><img src="./assets/icons/ico_appdata.png" alt="">ProgramData</button>
-          <button class="tool-button" data-open="chrome_history" type="button"><img src="./assets/icons/ico_chrome.png" alt="">Chrome user data</button>
-          <button class="tool-button" data-open="edge_history" type="button"><img src="./assets/icons/ico_edge.png" alt="">Edge user data</button>
-          <button class="tool-button" data-open="everything" type="button"><img src="./assets/icons/everything_ico.png" alt="">Everything</button>
-          <button class="tool-button" data-open="lastactivity" type="button"><img src="./assets/icons/lastactivityview_ico.png" alt="">LastActivityView</button>
-          <button class="tool-button" data-open="executedprograms" type="button"><img src="./assets/icons/executedprogramslist_ico.png" alt="">ExecutedProgramsList</button>
-          <button class="tool-button" data-open="cachedprograms" type="button"><img src="./assets/icons/cacheprogramlist_ico.png" alt="">CachedProgramsList</button>
-          <button class="tool-button" data-open="journaltrace" type="button"><img src="./assets/icons/JournalTrace_ico.png" alt="">JournalTrace</button>
-          <button class="tool-button" data-open="usbdeview" type="button"><img src="./assets/icons/usbdeview_ico.png" alt="">USBDeview</button>
-          <button class="tool-button" data-open="usbdrivelog" type="button"><img src="./assets/icons/usbdrivelog_ico.png" alt="">USBDriveLog</button>
-          <button class="tool-button" data-open="shellbags" type="button"><img src="./assets/icons/Shellbag_ico.png" alt="">ShellBags</button>
+        <div class="tool-list">
+          <button class="tool-button tool-list-row" data-open="everything" type="button"><img src="./assets/icons/everything_ico.png" alt=""><span><strong>Everything</strong><small>Поиск файлов и папок</small></span><span class="tool-launch" aria-hidden="true">↗</span></button>
+          <button class="tool-button tool-list-row" data-open="lastactivity" type="button"><img src="./assets/icons/lastactivityview_ico.png" alt=""><span><strong>LastActivityView</strong><small>Последние действия в системе</small></span><span class="tool-launch" aria-hidden="true">↗</span></button>
+          <button class="tool-button tool-list-row" data-open="executedprograms" type="button"><img src="./assets/icons/executedprogramslist_ico.png" alt=""><span><strong>ExecutedProgramsList</strong><small>История запуска программ</small></span><span class="tool-launch" aria-hidden="true">↗</span></button>
+          <button class="tool-button tool-list-row" data-open="cachedprograms" type="button"><img src="./assets/icons/cacheprogramlist_ico.png" alt=""><span><strong>CachedProgramsList</strong><small>Кэш сведений о программах</small></span><span class="tool-launch" aria-hidden="true">↗</span></button>
+          <button class="tool-button tool-list-row" data-open="journaltrace" type="button"><img src="./assets/icons/JournalTrace_ico.png" alt=""><span><strong>JournalTrace</strong><small>Журнал изменений файлов</small></span><span class="tool-launch" aria-hidden="true">↗</span></button>
+          <button class="tool-button tool-list-row" data-open="usbdeview" type="button"><img src="./assets/icons/usbdeview_ico.png" alt=""><span><strong>USBDeview</strong><small>Подключённые и известные USB-устройства</small></span><span class="tool-launch" aria-hidden="true">↗</span></button>
+          <button class="tool-button tool-list-row" data-open="usbdrivelog" type="button"><img src="./assets/icons/usbdrivelog_ico.png" alt=""><span><strong>USBDriveLog</strong><small>История подключения USB-накопителей</small></span><span class="tool-launch" aria-hidden="true">↗</span></button>
+          <button class="tool-button tool-list-row" data-open="shellbags" type="button"><img src="./assets/icons/Shellbag_ico.png" alt=""><span><strong>ShellBags</strong><small>История просмотра папок</small></span><span class="tool-launch" aria-hidden="true">↗</span></button>
+          <div id="toolsEmpty" class="empty-state hidden">Программы не найдены.</div>
         </div>
       </section>
 
       <section class="page" id="page-hotkeys">
-        <div class="section-head">
-          <div>
-            <h3>Hotkeys / paths</h3>
-            <p>Быстрые страницы для проверки читов, автозагрузок, реестра и системных следов.</p>
-          </div>
-          <input class="search-input" id="hotkeysSearch" type="search" placeholder="Search hotkeys...">
+        <div class="section-head"><div><h3>Горячие переходы</h3><p>Папки, системные настройки и источники истории.</p></div>
+          <input class="search-input" id="hotkeysSearch" type="search" placeholder="Поиск папки или раздела...">
         </div>
-        <div class="tool-grid">
-          <button class="tool-button hotkey-button" data-open="regedit" type="button"><img src="./assets/icons/ico_reg.png" alt="">Registry</button>
-          <button class="tool-button hotkey-button" data-open="registry_run" type="button"><img src="./assets/icons/ico_reg.png" alt="">Run keys</button>
-          <button class="tool-button hotkey-button" data-open="startup" type="button"><img src="./assets/icons/ico_winupdate.png" alt="">Startup folder</button>
-          <button class="tool-button hotkey-button" data-open="taskschd" type="button"><img src="./assets/icons/ico_eventlog.png" alt="">Task Scheduler</button>
-          <button class="tool-button hotkey-button" data-open="services" type="button"><img src="./assets/icons/icon_native.png" alt="">Services</button>
-          <button class="tool-button hotkey-button" data-open="taskmgr" type="button"><img src="./assets/icons/executedprogramslist_ico.png" alt="">Task Manager</button>
-          <button class="tool-button hotkey-button" data-open="drivers_dir" type="button"><img src="./assets/icons/icon_native.png" alt="">Drivers directory</button>
-          <button class="tool-button hotkey-button" data-open="hosts" type="button"><img src="./assets/icons/icon_path.png" alt="">Hosts file</button>
-          <button class="tool-button hotkey-button" data-open="firewall" type="button"><img src="./assets/icons/ico_eventlog.png" alt="">Firewall</button>
-          <button class="tool-button hotkey-button" data-open="installed_apps" type="button"><img src="./assets/icons/icon_tools.png" alt="">Installed apps</button>
-          <button class="tool-button hotkey-button" data-open="device_manager" type="button"><img src="./assets/icons/icon_path.png" alt="">Device Manager</button>
+        <div class="shortcut-sections">
+          <section class="shortcut-group"><h4>Папки пользователя</h4><div class="tool-grid">
+            <button class="tool-button hotkey-button" data-open="desktop" type="button"><img src="./assets/svg/shortcuts/monitor.svg" alt=""><span><strong>Рабочий стол</strong><small>Desktop</small></span></button>
+            <button class="tool-button hotkey-button" data-open="downloads" type="button"><img src="./assets/svg/shortcuts/folder.svg" alt=""><span><strong>Загрузки</strong><small>Downloads</small></span></button>
+            <button class="tool-button hotkey-button" data-open="temp" type="button"><img src="./assets/svg/shortcuts/folder.svg" alt=""><span><strong>Временные файлы</strong><small>Temp</small></span></button>
+            <button class="tool-button hotkey-button" data-open="appdata" type="button"><img src="./assets/svg/shortcuts/folder.svg" alt=""><span><strong>AppData</strong><small>Настройки приложений</small></span></button>
+            <button class="tool-button hotkey-button" data-open="localappdata" type="button"><img src="./assets/svg/shortcuts/folder.svg" alt=""><span><strong>LocalAppData</strong><small>Локальные данные приложений</small></span></button>
+            <button class="tool-button hotkey-button" data-open="programdata" type="button"><img src="./assets/svg/shortcuts/folder.svg" alt=""><span><strong>ProgramData</strong><small>Общие данные приложений</small></span></button>
+          </div></section>
+          <section class="shortcut-group"><h4>Следы и аккаунты</h4><div class="tool-grid">
+            <button class="tool-button hotkey-button" data-open="prefetch" type="button"><img src="./assets/svg/shortcuts/clock.svg" alt=""><span><strong>Prefetch</strong><small>Следы запуска программ</small></span></button>
+            <button class="tool-button hotkey-button" data-open="recent" type="button"><img src="./assets/svg/shortcuts/clock.svg" alt=""><span><strong>Недавние файлы</strong><small>Recent files</small></span></button>
+            <button class="tool-button hotkey-button" data-open="steam_loginusers" type="button"><img src="./assets/svg/shortcuts/file.svg" alt=""><span><strong>Аккаунты Steam</strong><small>loginusers.vdf</small></span></button>
+            <button class="tool-button hotkey-button" data-open="chrome_history" type="button"><img src="./assets/svg/shortcuts/browser.svg" alt=""><span><strong>Данные Chrome</strong><small>Профили браузера</small></span></button>
+            <button class="tool-button hotkey-button" data-open="edge_history" type="button"><img src="./assets/svg/shortcuts/browser.svg" alt=""><span><strong>Данные Edge</strong><small>Профили браузера</small></span></button>
+          </div></section>
+          <section class="shortcut-group"><h4>Система и автозагрузка</h4><div class="tool-grid">
+            <button class="tool-button hotkey-button" data-open="regedit" type="button"><img src="./assets/svg/shortcuts/registry.svg" alt=""><span><strong>Редактор реестра</strong><small>Registry</small></span></button>
+            <button class="tool-button hotkey-button" data-open="registry_run" type="button"><img src="./assets/svg/shortcuts/registry.svg" alt=""><span><strong>Ключи автозагрузки</strong><small>Registry Run</small></span></button>
+            <button class="tool-button hotkey-button" data-open="startup" type="button"><img src="./assets/svg/shortcuts/startup.svg" alt=""><span><strong>Папка автозагрузки</strong><small>Startup</small></span></button>
+            <button class="tool-button hotkey-button" data-open="taskschd" type="button"><img src="./assets/svg/shortcuts/calendar.svg" alt=""><span><strong>Планировщик задач</strong><small>Task Scheduler</small></span></button>
+            <button class="tool-button hotkey-button" data-open="services" type="button"><img src="./assets/svg/shortcuts/settings.svg" alt=""><span><strong>Службы</strong><small>Services</small></span></button>
+            <button class="tool-button hotkey-button" data-open="taskmgr" type="button"><img src="./assets/svg/shortcuts/monitor.svg" alt=""><span><strong>Диспетчер задач</strong><small>Task Manager</small></span></button>
+            <button class="tool-button hotkey-button" data-open="installed_apps" type="button"><img src="./assets/svg/shortcuts/package.svg" alt=""><span><strong>Установленные программы</strong><small>Installed apps</small></span></button>
+            <button class="tool-button hotkey-button" data-open="eventvwr" type="button"><img src="./assets/svg/shortcuts/file.svg" alt=""><span><strong>Просмотр событий</strong><small>Event Viewer</small></span></button>
+          </div></section>
+          <section class="shortcut-group"><h4>Устройства и сеть</h4><div class="tool-grid">
+            <button class="tool-button hotkey-button" data-open="drivers_dir" type="button"><img src="./assets/svg/shortcuts/device.svg" alt=""><span><strong>Папка драйверов</strong><small>System32 / drivers</small></span></button>
+            <button class="tool-button hotkey-button" data-open="device_manager" type="button"><img src="./assets/svg/shortcuts/device.svg" alt=""><span><strong>Диспетчер устройств</strong><small>Device Manager</small></span></button>
+            <button class="tool-button hotkey-button" data-open="hosts" type="button"><img src="./assets/svg/shortcuts/network.svg" alt=""><span><strong>Файл hosts</strong><small>Сетевые сопоставления</small></span></button>
+            <button class="tool-button hotkey-button" data-open="firewall" type="button"><img src="./assets/svg/shortcuts/shield.svg" alt=""><span><strong>Брандмауэр</strong><small>Firewall</small></span></button>
+          </div></section>
+          <div id="hotkeysEmpty" class="empty-state hidden">Переходы не найдены.</div>
         </div>
       </section>
 
