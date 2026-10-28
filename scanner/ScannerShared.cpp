@@ -364,9 +364,9 @@ std::wstring GetModuleDirectory() {
     return p.parent_path().wstring();
 }
 
-std::wstring ComputeSha256Hex(const std::wstring& path, size_t maxBytesToRead) {
-    HANDLE hFile = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                               nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+std::wstring ComputeSha256Hex(const std::wstring& path) {
+    HANDLE hFile = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                               nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
     if (hFile == INVALID_HANDLE_VALUE) {
         return L"";
     }
@@ -399,25 +399,21 @@ std::wstring ComputeSha256Hex(const std::wstring& path, size_t maxBytesToRead) {
     }
 
     std::array<unsigned char, 64 * 1024> buffer{};
-    ULONGLONG totalRead = 0;
     DWORD readBytes = 0;
-    while (ReadFile(hFile, buffer.data(), static_cast<DWORD>(buffer.size()), &readBytes, nullptr) && readBytes > 0) {
-        if (maxBytesToRead > 0 && totalRead + readBytes > maxBytesToRead) {
-            readBytes = static_cast<DWORD>(maxBytesToRead - totalRead);
-        }
-
-        if (readBytes == 0) break;
-        if (BCryptHashData(hHash, buffer.data(), readBytes, 0) < 0) {
+    bool ok = true;
+    for (;;) {
+        if (!ReadFile(hFile, buffer.data(), static_cast<DWORD>(buffer.size()), &readBytes, nullptr)) {
+            ok = false;
             break;
         }
-
-        totalRead += readBytes;
-        if (maxBytesToRead > 0 && totalRead >= maxBytesToRead) {
+        if (readBytes == 0) break;
+        if (BCryptHashData(hHash, buffer.data(), readBytes, 0) < 0) {
+            ok = false;
             break;
         }
     }
 
-    bool ok = BCryptFinishHash(hHash, hashValue, cbHash, 0) >= 0;
+    ok = ok && BCryptFinishHash(hHash, hashValue, cbHash, 0) >= 0;
 
     std::wstring hex;
     if (ok) {

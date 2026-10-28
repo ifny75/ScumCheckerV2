@@ -277,7 +277,8 @@ void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& 
         // 1) Known-bad hash — strongest, always wins.
         bool hashMatched = false;
         if (!rules.hashes.empty()) {
-            auto hash = ns::ComputeSha256Hex(path, 2 * 1024 * 1024);
+            auto hash = ns::ComputeSha256Hex(path);
+            if (hash.empty()) out.errors++;
             if (!hash.empty()) {
                 auto hashLower = ns::ToLowerCopy(hash);
                 if (std::find(rules.hashes.begin(), rules.hashes.end(), hashLower) != rules.hashes.end()) {

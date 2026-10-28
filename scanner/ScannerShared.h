@@ -69,7 +69,8 @@ std::wstring ExpandEnvironment(const std::wstring& src);
 bool PathExistsFile(const std::wstring& path);
 
 std::wstring GetModuleDirectory();
-std::wstring ComputeSha256Hex(const std::wstring& path, size_t maxBytesToRead = 0);
+// Full-file SHA-256; an empty string indicates an open, read, or hashing error.
+std::wstring ComputeSha256Hex(const std::wstring& path);
 RuleSet LoadRulesFromJson(const std::wstring& filePath);
 
 } // namespace ns

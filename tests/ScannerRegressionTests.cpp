@@ -125,6 +125,37 @@ void TestLiveModuleSnapshot() {
     Require(std::find(modules->begin(), modules->end(), GetModuleHandleW(nullptr)) != modules->end(),
         "Live module snapshot omitted the executable");
 }
+
+void TestFullFileHashes() {
+    Fixture fixture;
+    const auto file = fixture.root / L"hash-fixture.json";
+    std::ofstream(file, std::ios::binary) << "abc";
+    Require(ns::ComputeSha256Hex(file.wstring()) ==
+        L"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "SHA-256 known vector mismatch");
+    std::ofstream(file, std::ios::binary | std::ios::trunc).close();
+    Require(ns::ComputeSha256Hex(file.wstring()) ==
+        L"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Empty file SHA-256 mismatch");
+    {
+        std::ofstream out(file, std::ios::binary | std::ios::trunc);
+        out << std::string(2 * 1024 * 1024, 'a') << "tail";
+    }
+    const std::wstring expected = L"e04a36603efd1d3d31610f6f8328106c07e817025de43a8d99ecffc98a040eb5";
+    Require(ns::ComputeSha256Hex(file.wstring()) == expected, "Hash omitted bytes after 2 MiB");
+    ns::RuleSet rules;
+    rules.hashes = {expected};
+    const auto result = ns::RunFileScanner(rules, {fixture.root.wstring()});
+    Require(result.errors == 0 && result.findings.size() == 1 && result.findings[0].score == 98,
+        "File scanner failed to match a full hash above 2 MiB");
+    Require(ns::ComputeSha256Hex((fixture.root / L"missing").wstring()).empty(),
+        "Missing file returned a hash");
+    HANDLE locked = CreateFileW(file.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    Require(locked != INVALID_HANDLE_VALUE, "Could not lock hash fixture");
+    const auto hash = ns::ComputeSha256Hex(file.wstring());
+    CloseHandle(locked);
+    Require(hash.empty(), "Unreadable file returned a hash");
+}
 }
 
 int main() {
@@ -135,6 +166,7 @@ int main() {
         TestGrowingModuleSnapshot();
         TestIncompleteModuleSnapshots();
         TestLiveModuleSnapshot();
+        TestFullFileHashes();
         std::cout << "Scanner regressions passed\n";
         return 0;
     } catch (const std::exception& ex) {
