@@ -49,31 +49,12 @@ void ApplyRiskAnalysis(std::vector<NsFinding>& findings) {
 
     for (auto& f : unique) {
         int sev = ClampSeverity(f.severity);
-        int score = f.score;
+        int score = std::clamp(f.score, 0, 100);
 
         std::wstring path = ns::ToLowerCopy(f.evidence_path);
-        std::wstring title = ns::ToLowerCopy(f.title);
-        std::wstring reason = ns::ToLowerCopy(f.reason);
 
-        const bool tempPath = path.find(L"\\temp\\") != std::wstring::npos;
-        const bool userPath = tempPath || path.find(L"\\appdata\\") != std::wstring::npos;
-        const bool kernelStrong =
-            title.find(L"mapper") != std::wstring::npos ||
-            title.find(L"vulnerable kernel") != std::wstring::npos ||
-            title.find(L"kernel driver") != std::wstring::npos ||
-            title.find(L"test-signing") != std::wstring::npos ||
-            title.find(L"dse") != std::wstring::npos ||
-            title.find(L"leaked certificate") != std::wstring::npos;
-
-        if (userPath && kernelStrong) {
-            score += 5;
-        }
-        if ((title.find(L"unsigned") != std::wstring::npos || reason.find(L"unsigned") != std::wstring::npos) && kernelStrong) {
-            score += 5;
-        }
-        if (kernelStrong) {
-            score += 10;
-        }
+        // Detectors own the initial severity and score. Display text is not
+        // evidence: renaming or translating a finding must not alter its risk.
 
         if (!path.empty()) {
             auto it = perEvidenceCount.find(path);
@@ -83,14 +64,8 @@ void ApplyRiskAnalysis(std::vector<NsFinding>& findings) {
             }
         }
 
-        if (score >= 90 && kernelStrong) sev = NS_SEVERITY_HIGH;
-        else if (score >= 72) sev = std::max(sev, static_cast<int>(NS_SEVERITY_MEDIUM));
+        if (score >= 72) sev = std::max(sev, static_cast<int>(NS_SEVERITY_MEDIUM));
         else if (score >= 45) sev = std::max(sev, static_cast<int>(NS_SEVERITY_LOW));
-
-        if (!kernelStrong && sev == NS_SEVERITY_HIGH) {
-            sev = NS_SEVERITY_MEDIUM;
-            score = std::min(score, 78);
-        }
 
         f.score = std::min(score, 100);
         f.severity = ClampSeverity(sev);
