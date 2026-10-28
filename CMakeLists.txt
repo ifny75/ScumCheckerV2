@@ -55,6 +55,7 @@ add_library(scum_scanner STATIC
     scanner/RiskAnalyzer.cpp
     scanner/RiskAnalyzer.h
     scanner/ScanReporting.h
+    scanner/ScanRunner.h
 )
 
 target_compile_definitions(scum_scanner PRIVATE

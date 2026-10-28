@@ -15,6 +15,7 @@
 #include "RegistryScanner.h"
 #include "RiskAnalyzer.h"
 #include "ScanReporting.h"
+#include "ScanRunner.h"
 #include "ScannerShared.h"
 #include "SecurityConfigScanner.h"
 #include "SteamScanner.h"
@@ -65,8 +66,6 @@ std::wstring ResolveRulesPath() {
 }
 
 int FinishScanResult(
-    NsFinding* findings_buffer,
-    int findings_capacity,
     NsReport* out_report,
     const std::chrono::steady_clock::time_point& started,
     std::vector<NsFinding>& findings) {
@@ -77,15 +76,7 @@ int FinishScanResult(
             return a.score > b.score;
         });
 
-    if (findings_buffer && findings_capacity > 0 && !findings.empty()) {
-        const int copyCount = std::min<int>(findings_capacity, static_cast<int>(findings.size()));
-        for (int i = 0; i < copyCount; ++i) {
-            findings_buffer[i] = findings[static_cast<size_t>(i)];
-        }
-        out_report->findings_returned = copyCount;
-    } else {
-        out_report->findings_returned = 0;
-    }
+    out_report->findings_total = out_report->findings_returned = static_cast<int>(findings.size());
 
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - started);
@@ -95,21 +86,15 @@ int FinishScanResult(
 
 template <typename Fn>
 int RunSingleModuleScan(
-    NsFinding* findings_buffer,
-    int findings_capacity,
+    std::vector<NsFinding>& findings,
     NsReport* out_report,
     const wchar_t* moduleName,
     Fn&& module) {
-    if (!out_report || findings_capacity < 0) {
-        return NS_STATUS_INVALID_ARGUMENT;
-    }
-
     *out_report = {};
     out_report->status = NS_STATUS_OK;
     out_report->ran_as_admin = IsAdmin() ? 1 : 0;
 
     const auto started = std::chrono::steady_clock::now();
-    std::vector<NsFinding> findings;
 
     try {
         const auto rulesPath = ResolveRulesPath();
@@ -121,7 +106,7 @@ int RunSingleModuleScan(
         out_report->status = NS_STATUS_INTERNAL_ERROR;
     }
 
-    return FinishScanResult(findings_buffer, findings_capacity, out_report, started, findings);
+    return FinishScanResult(out_report, started, findings);
 }
 
 } // namespace
@@ -135,21 +120,13 @@ extern "C" __declspec(dllexport) void __stdcall Ns_SetRulesPath(const wchar_t* r
     g_rulesPath = rules_path ? rules_path : L"";
 }
 
-extern "C" __declspec(dllexport) int __stdcall Ns_RunDriverMemoryScan(
-    NsFinding* findings_buffer,
-    int findings_capacity,
-    NsReport* out_report) {
-    if (!out_report || findings_capacity < 0) {
-        return NS_STATUS_INVALID_ARGUMENT;
-    }
-
+static int RunDriverMemoryScan(std::vector<NsFinding>& findings, NsReport* out_report) {
     *out_report = {};
     out_report->status = NS_STATUS_OK;
     out_report->ran_as_admin = IsAdmin() ? 1 : 0;
 
     const auto started = std::chrono::steady_clock::now();
-    std::vector<NsFinding> findings;
-    findings.reserve(static_cast<size_t>(findings_capacity > 0 ? findings_capacity : 512));
+    findings.reserve(512);
 
     try {
         const auto rulesPath = ResolveRulesPath();
@@ -182,48 +159,31 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunDriverMemoryScan(
         out_report->status = NS_STATUS_INTERNAL_ERROR;
     }
 
-    return FinishScanResult(findings_buffer, findings_capacity, out_report, started, findings);
+    return FinishScanResult(out_report, started, findings);
 }
 
-extern "C" __declspec(dllexport) int __stdcall Ns_RunSteamScan(
-    NsFinding* findings_buffer,
-    int findings_capacity,
-    NsReport* out_report) {
-    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report, L"Steam",
+static int RunSteamScan(std::vector<NsFinding>& findings, NsReport* out_report) {
+    return RunSingleModuleScan(findings, out_report, L"Steam",
         [](const ns::RuleSet& rules) { return ns::RunSteamScanner(rules); });
 }
 
-extern "C" __declspec(dllexport) int __stdcall Ns_RunHistoryScan(
-    NsFinding* findings_buffer,
-    int findings_capacity,
-    NsReport* out_report) {
-    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report, L"History",
+static int RunHistoryScan(std::vector<NsFinding>& findings, NsReport* out_report) {
+    return RunSingleModuleScan(findings, out_report, L"History",
         [](const ns::RuleSet& rules) { return ns::RunSystemHistoryInspector(rules); });
 }
 
-extern "C" __declspec(dllexport) int __stdcall Ns_RunSecurityConfigScan(
-    NsFinding* findings_buffer,
-    int findings_capacity,
-    NsReport* out_report) {
+static int RunSecurityConfigScan(std::vector<NsFinding>& findings, NsReport* out_report) {
     const bool isAdmin = IsAdmin();
-    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report, L"Security configuration",
+    return RunSingleModuleScan(findings, out_report, L"Security configuration",
         [isAdmin](const ns::RuleSet& rules) { return ns::RunSecurityConfigScanner(rules, isAdmin); });
 }
 
-extern "C" __declspec(dllexport) int __stdcall Ns_RunDmaNetworkInspect(
-    NsFinding* findings_buffer,
-    int findings_capacity,
-    NsReport* out_report) {
-    if (!out_report || findings_capacity < 0) {
-        return NS_STATUS_INVALID_ARGUMENT;
-    }
-
+static int RunDmaNetworkInspect(std::vector<NsFinding>& findings, NsReport* out_report) {
     *out_report = {};
     out_report->status = NS_STATUS_OK;
     out_report->ran_as_admin = IsAdmin() ? 1 : 0;
 
     const auto started = std::chrono::steady_clock::now();
-    std::vector<NsFinding> findings;
 
     try {
         const auto rulesPath = ResolveRulesPath();
@@ -240,24 +200,16 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunDmaNetworkInspect(
         out_report->status = NS_STATUS_INTERNAL_ERROR;
     }
 
-    return FinishScanResult(findings_buffer, findings_capacity, out_report, started, findings);
+    return FinishScanResult(out_report, started, findings);
 }
 
-extern "C" __declspec(dllexport) int __stdcall Ns_RunKernelSysScan(
-    NsFinding* findings_buffer,
-    int findings_capacity,
-    NsReport* out_report) {
-    if (!out_report || findings_capacity < 0) {
-        return NS_STATUS_INVALID_ARGUMENT;
-    }
-
+static int RunKernelSysScan(std::vector<NsFinding>& findings, NsReport* out_report) {
     *out_report = {};
     out_report->status = NS_STATUS_OK;
     out_report->ran_as_admin = IsAdmin() ? 1 : 0;
 
     const auto started = std::chrono::steady_clock::now();
-    std::vector<NsFinding> findings;
-    findings.reserve(static_cast<size_t>(findings_capacity > 0 ? findings_capacity : 512));
+    findings.reserve(512);
 
     try {
         const auto rulesPath = ResolveRulesPath();
@@ -290,5 +242,55 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunKernelSysScan(
         out_report->status = NS_STATUS_INTERNAL_ERROR;
     }
 
-    return FinishScanResult(findings_buffer, findings_capacity, out_report, started, findings);
+    return FinishScanResult(out_report, started, findings);
+}
+
+namespace ns {
+int RunScan(ScanMode mode, std::vector<NsFinding>& findings, NsReport& report) {
+    findings.clear();
+    switch (mode) {
+    case ScanMode::Full: return RunDriverMemoryScan(findings, &report);
+    case ScanMode::Steam: return RunSteamScan(findings, &report);
+    case ScanMode::History: return RunHistoryScan(findings, &report);
+    case ScanMode::SecurityConfig: return RunSecurityConfigScan(findings, &report);
+    case ScanMode::DmaNetwork: return RunDmaNetworkInspect(findings, &report);
+    case ScanMode::Kernel: return RunKernelSysScan(findings, &report);
+    }
+    report = {};
+    report.status = NS_STATUS_INVALID_ARGUMENT;
+    return report.status;
+}
+}
+
+namespace {
+int RunBufferedScan(ns::ScanMode mode, NsFinding* buffer, int capacity, NsReport* report) {
+    if (!report || capacity < 0 || (capacity > 0 && !buffer)) return NS_STATUS_INVALID_ARGUMENT;
+    std::vector<NsFinding> findings;
+    ns::RunScan(mode, findings, *report);
+    return ns::CopyScanFindings(findings, buffer, capacity, *report);
+}
+}
+
+extern "C" __declspec(dllexport) int __stdcall Ns_RunDriverMemoryScan(NsFinding* buffer, int capacity, NsReport* report) {
+    return RunBufferedScan(ns::ScanMode::Full, buffer, capacity, report);
+}
+
+extern "C" __declspec(dllexport) int __stdcall Ns_RunSteamScan(NsFinding* buffer, int capacity, NsReport* report) {
+    return RunBufferedScan(ns::ScanMode::Steam, buffer, capacity, report);
+}
+
+extern "C" __declspec(dllexport) int __stdcall Ns_RunHistoryScan(NsFinding* buffer, int capacity, NsReport* report) {
+    return RunBufferedScan(ns::ScanMode::History, buffer, capacity, report);
+}
+
+extern "C" __declspec(dllexport) int __stdcall Ns_RunSecurityConfigScan(NsFinding* buffer, int capacity, NsReport* report) {
+    return RunBufferedScan(ns::ScanMode::SecurityConfig, buffer, capacity, report);
+}
+
+extern "C" __declspec(dllexport) int __stdcall Ns_RunDmaNetworkInspect(NsFinding* buffer, int capacity, NsReport* report) {
+    return RunBufferedScan(ns::ScanMode::DmaNetwork, buffer, capacity, report);
+}
+
+extern "C" __declspec(dllexport) int __stdcall Ns_RunKernelSysScan(NsFinding* buffer, int capacity, NsReport* report) {
+    return RunBufferedScan(ns::ScanMode::Kernel, buffer, capacity, report);
 }

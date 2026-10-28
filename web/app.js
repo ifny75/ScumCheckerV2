@@ -8,6 +8,7 @@ const state = {
   findingsFiltersOpen: false,
   lastFindings: [],
   scanReports: {},
+  resultChunks: {},
   scanQueue: [],
   scanBusy: false,
   currentMode: null,
@@ -452,6 +453,7 @@ function selectProfile(profileId) {
   state.activeProfile = profile.id;
   state.lastFindings = [];
   state.scanReports = {};
+  state.resultChunks = {};
   renderScanReports();
   state.steamProfiles = {};
   state.scanQueue = [];
@@ -1235,9 +1237,17 @@ function renderScanReports() {
     ? `Scan stages: ${entries.length}; incomplete: ${incomplete}`
     : `Этапов проверки: ${entries.length}; неполных: ${incomplete}`;
   document.querySelector("#scanReportModules").innerHTML = entries.map(([mode, result]) => {
-    const modules = (result.report?.modules || []).map(module =>
-      `${module.name}: ${ScanReport.moduleLabel(module.status, state.lang)} (${module.errors || 0})`);
-    const details = result.message || modules.join("; ");
+    const ru = state.lang !== "en";
+    const modules = (result.report?.modules || []).map(module => {
+      const coverage = ru
+        ? `лимит объектов: ${module.rootsLimited || 0}, лимит глубины: ${module.depthLimitedDirectories || 0}, исключено папок: ${module.excludedDirectories || 0}`
+        : `entry limit: ${module.rootsLimited || 0}, depth limit: ${module.depthLimitedDirectories || 0}, excluded directories: ${module.excludedDirectories || 0}`;
+      return `${module.name}: ${ScanReport.moduleLabel(module.status, state.lang)} (${module.errors || 0}); ${coverage}`;
+    });
+    const totals = ru
+      ? `Находок: ${result.report?.findingsTotal || 0}; не передано: ${result.report?.findingsTruncated || 0}. `
+      : `Findings: ${result.report?.findingsTotal || 0}; omitted: ${result.report?.findingsTruncated || 0}. `;
+    const details = totals + (result.message || modules.join("; "));
     return `<p><strong>${escapeHtml(mode)}: ${escapeHtml(ScanReport.label(result, state.lang))}</strong><br>${escapeHtml(details)}</p>`;
   }).join("");
 }
@@ -1275,7 +1285,7 @@ function mergeFindings(mode, incoming) {
   }
 
   state.lastFindings = state.lastFindings.filter(item => !groups.includes(categoryGroup(item.category)));
-  state.lastFindings.push(...incoming);
+  state.lastFindings = state.lastFindings.concat(incoming);
 }
 
 function receive(message) {
@@ -1289,13 +1299,18 @@ function receive(message) {
       applyAdminText();
       break;
     case "scanStarted":
+      state.resultChunks[message.mode] = ScanReport.beginChunks(message.profile, message.mode);
       setStatus(`Scanning ${message.profile} (${message.mode})...`);
+      break;
+    case "scanChunk":
+      ScanReport.appendChunk(state.resultChunks[message.mode], message);
       break;
     case "scanBusy":
       setStatus("Native scanner is busy. Try again after current scan.");
       finishScanStep(false);
       break;
     case "scanError":
+      delete state.resultChunks[state.currentMode || "full"];
       state.scanReports[state.currentMode || "full"] = message;
       renderScanReports();
       setStatus(message.message || "Scan failed.");
@@ -1304,6 +1319,8 @@ function receive(message) {
       break;
     case "scanResult": {
       const mode = message.mode || state.currentMode || "full";
+      if (message.chunked) message = ScanReport.finishChunks(state.resultChunks[mode], message);
+      delete state.resultChunks[mode];
       state.scanReports[mode] = message;
       renderScanReports();
       state.completedModes.add(mode);

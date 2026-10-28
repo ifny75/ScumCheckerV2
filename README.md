@@ -42,3 +42,11 @@ The tests use temporary fixture files and the test process itself; they do not
 scan the user's folders or load a driver. They cover repeated file scans,
 changed rules, overlapping roots, risk scoring independent of display text,
 deduplication, and growing or incomplete process module snapshots.
+
+The desktop UI retains all findings from a single scan and receives them in
+chunks of 256. The legacy caller-buffer API reports `findings_total` and
+`findings_truncated` and returns `NS_STATUS_PARTIAL` when the buffer is too small.
+Native consumers must rebuild against the current `NsReport` definition.
+The scan summary also lists module failures, access limitations, and file roots
+or directories skipped by entry limits, depth limits, or directory exclusions.
+When Node.js is available, CTest also checks report status and chunk delivery.

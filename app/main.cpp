@@ -11,6 +11,7 @@
 #include <wrl.h>
 
 #include "NativeScannerApi.h"
+#include "ScanRunner.h"
 #include "resource.h"
 #include "web_manifest.h"
 
@@ -23,6 +24,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -346,15 +348,19 @@ std::wstring ScanResultJson(
     const std::wstring& mode,
     int status,
     const NsReport& report,
-    const std::vector<NsFinding>& findings) {
+    const std::vector<NsFinding>& findings,
+    bool chunked = false) {
     std::wstringstream json;
     json << L"{"
          << L"\"type\":\"scanResult\","
          << L"\"profile\":" << JsonString(profile) << L","
          << L"\"mode\":" << JsonString(mode) << L","
+         << L"\"chunked\":" << (chunked ? L"true" : L"false") << L","
          << L"\"status\":" << status << L","
          << L"\"report\":{"
          << L"\"findingsReturned\":" << report.findings_returned << L","
+         << L"\"findingsTotal\":" << report.findings_total << L","
+         << L"\"findingsTruncated\":" << report.findings_truncated << L","
          << L"\"filesChecked\":" << report.files_checked << L","
          << L"\"driversChecked\":" << report.drivers_checked << L","
          << L"\"servicesChecked\":" << report.services_checked << L","
@@ -369,7 +375,10 @@ std::wstring ScanResultJson(
         if (i) json << L",";
         const auto& module = report.modules[i];
         json << L"{\"name\":" << JsonString(module.name)
-             << L",\"status\":" << module.status << L",\"errors\":" << module.errors << L"}";
+             << L",\"status\":" << module.status << L",\"errors\":" << module.errors
+             << L",\"rootsLimited\":" << module.roots_limited
+             << L",\"depthLimitedDirectories\":" << module.depth_limited_directories
+             << L",\"excludedDirectories\":" << module.excluded_directories << L"}";
     }
     json << L"]},\"findings\":[";
 
@@ -409,30 +418,40 @@ void RunScanAsync(std::wstring profile, std::wstring mode) {
             const auto rulesPath = ProfilePath(profile).wstring();
             Ns_SetRulesPath(rulesPath.c_str());
 
-            constexpr int kCapacity = 4096;
-            std::vector<NsFinding> buffer(kCapacity);
+            ns::ScanMode scanMode = ns::ScanMode::Full;
+            if (mode == L"dma") scanMode = ns::ScanMode::DmaNetwork;
+            else if (mode == L"steam") scanMode = ns::ScanMode::Steam;
+            else if (mode == L"history") scanMode = ns::ScanMode::History;
+            else if (mode == L"seccfg") scanMode = ns::ScanMode::SecurityConfig;
+            else if (mode == L"kernel") scanMode = ns::ScanMode::Kernel;
+            std::vector<NsFinding> findings;
             NsReport report{};
-            int status = 0;
+            const int status = ns::RunScan(scanMode, findings, report);
 
-            if (mode == L"dma") {
-                status = Ns_RunDmaNetworkInspect(buffer.data(), static_cast<int>(buffer.size()), &report);
-            } else if (mode == L"steam") {
-                status = Ns_RunSteamScan(buffer.data(), static_cast<int>(buffer.size()), &report);
-            } else if (mode == L"history") {
-                status = Ns_RunHistoryScan(buffer.data(), static_cast<int>(buffer.size()), &report);
-            } else if (mode == L"seccfg") {
-                status = Ns_RunSecurityConfigScan(buffer.data(), static_cast<int>(buffer.size()), &report);
-            } else if (mode == L"kernel") {
-                status = Ns_RunKernelSysScan(buffer.data(), static_cast<int>(buffer.size()), &report);
-            } else {
-                status = Ns_RunDriverMemoryScan(buffer.data(), static_cast<int>(buffer.size()), &report);
+            // Send one retained scan snapshot in bounded messages. Re-scanning
+            // to resize a caller buffer would produce inconsistent evidence.
+            constexpr size_t chunkSize = 256;
+            for (size_t offset = 0; offset < findings.size(); offset += chunkSize) {
+                std::wstringstream json;
+                json << L"{\"type\":\"scanChunk\",\"profile\":" << JsonString(profile)
+                     << L",\"mode\":" << JsonString(mode) << L",\"offset\":" << offset << L",\"findings\":[";
+                const size_t end = (std::min)(offset + chunkSize, findings.size());
+                for (size_t i = offset; i < end; ++i) {
+                    if (i != offset) json << L",";
+                    json << FindingToJson(findings[i]);
+                }
+                json << L"]}";
+                auto chunk = std::make_unique<std::wstring>(json.str());
+                if (!PostMessageW(g_app.hwnd, WM_SCAN_RESULT, 0, reinterpret_cast<LPARAM>(chunk.get()))) {
+                    throw std::runtime_error("Could not deliver scan results");
+                }
+                chunk.release();
             }
-
-            const int count = std::clamp(report.findings_returned, 0, static_cast<int>(buffer.size()));
-            buffer.resize(static_cast<size_t>(count));
-
-            auto payload = std::make_unique<std::wstring>(ScanResultJson(profile, mode, status, report, buffer));
-            PostMessageW(g_app.hwnd, WM_SCAN_RESULT, 0, reinterpret_cast<LPARAM>(payload.release()));
+            auto payload = std::make_unique<std::wstring>(ScanResultJson(profile, mode, status, report, {}, true));
+            if (!PostMessageW(g_app.hwnd, WM_SCAN_RESULT, 0, reinterpret_cast<LPARAM>(payload.get()))) {
+                throw std::runtime_error("Could not deliver final scan report");
+            }
+            payload.release();
         } catch (const std::exception& ex) {
             std::wstring message(ex.what(), ex.what() + strlen(ex.what()));
             PostScanError(profile, message);
@@ -741,7 +760,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
         return 0;
     case WM_SCAN_RESULT: {
         std::unique_ptr<std::wstring> payload(reinterpret_cast<std::wstring*>(lParam));
-        if (payload && payload->find(L"\"type\":\"steamProfile\"") == std::wstring::npos) {
+        if (payload && (payload->find(L"\"type\":\"scanResult\"") != std::wstring::npos ||
+                        payload->find(L"\"type\":\"scanError\"") != std::wstring::npos)) {
             g_app.scanRunning = false;
         }
         if (payload) SendToWeb(*payload);

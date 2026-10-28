@@ -171,36 +171,50 @@ std::vector<RootSpec> BuildRoots() {
     return unique;
 }
 
-void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& out, ScanState& state) {
+void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& out, ScanState& state,
+              const ns::FileScanLimits& limits) {
     std::error_code ec;
+    // Probe access explicitly, then allow the recursive iterator to keep
+    // scanning siblings if another directory becomes inaccessible later.
+    std::filesystem::directory_iterator rootProbe(std::filesystem::path(root.path), ec);
+    if (ec) { out.errors++; return; }
     std::filesystem::recursive_directory_iterator it(
         std::filesystem::path(root.path),
         std::filesystem::directory_options::skip_permission_denied,
         ec);
+    if (ec) { out.errors++; return; }
     std::filesystem::recursive_directory_iterator end;
 
     int visited = 0;
-    constexpr int kMaxVisitedPerRoot = 35000;
+    auto advance = [&]() {
+        it.increment(ec);
+        if (ec) { out.errors++; ec.clear(); }
+    };
+    for (; it != end; advance()) {
 
-    for (; it != end; it.increment(ec)) {
-        if (ec) {
-            out.errors++;
-            ec.clear();
-            continue;
-        }
-
-        if (++visited > kMaxVisitedPerRoot) {
+        if (++visited > limits.max_entries_per_root) {
+            out.roots_limited++;
             break;
         }
 
         if (it->is_directory(ec)) {
             if (!ec && ShouldSkipDirectory(it->path())) {
+                out.excluded_directories++;
                 it.disable_recursion_pending();
                 ec.clear();
                 continue;
             }
-            if (!ec && it.depth() >= root.maxDepth) {
+            if (!ec && it.depth() >= (std::min)(root.maxDepth, limits.max_depth)) {
+                out.depth_limited_directories++;
                 it.disable_recursion_pending();
+            }
+            if (it.recursion_pending()) {
+                std::filesystem::directory_iterator probe(it->path(), ec);
+                if (ec) {
+                    out.errors++;
+                    it.disable_recursion_pending();
+                    ec.clear();
+                }
             }
 
             const auto dirLower = ns::ToLowerCopy(it->path().wstring());
@@ -402,8 +416,14 @@ ModuleOutput RunFileScanner(const RuleSet& rules) {
     return RunFileScanner(rules, {});
 }
 
-ModuleOutput RunFileScanner(const RuleSet& rules, const std::vector<std::wstring>& selectedRoots) {
+ModuleOutput RunFileScanner(const RuleSet& rules, const std::vector<std::wstring>& selectedRoots,
+                            FileScanLimits limits) {
     ModuleOutput merged;
+    if (limits.max_depth < 0 || limits.max_entries_per_root < 1) {
+        merged.status = NS_MODULE_FAILED;
+        merged.errors = 1;
+        return merged;
+    }
     auto roots = selectedRoots.empty() ? BuildRoots() : std::vector<RootSpec>{};
     for (const auto& path : selectedRoots) AddRoot(roots, path, 5);
     ScanState state;
@@ -415,10 +435,10 @@ ModuleOutput RunFileScanner(const RuleSet& rules, const std::vector<std::wstring
     tasks.reserve(roots.size());
 
     for (const auto& r : roots) {
-        tasks.push_back(std::async(std::launch::async, [r, &rules, &state]() {
+        tasks.push_back(std::async(std::launch::async, [r, &rules, &state, limits]() {
             ModuleOutput mo;
             try {
-                ScanRoot(r, rules, mo, state);
+                ScanRoot(r, rules, mo, state, limits);
             } catch (...) {
                 mo.errors++;
             }
@@ -430,9 +450,15 @@ ModuleOutput RunFileScanner(const RuleSet& rules, const std::vector<std::wstring
         auto mo = t.get();
         merged.files_checked += mo.files_checked;
         merged.errors += mo.errors;
+        merged.roots_limited += mo.roots_limited;
+        merged.depth_limited_directories += mo.depth_limited_directories;
+        merged.excluded_directories += mo.excluded_directories;
         merged.findings.insert(merged.findings.end(), mo.findings.begin(), mo.findings.end());
     }
 
+    if (merged.errors || merged.roots_limited || merged.depth_limited_directories || merged.excluded_directories) {
+        merged.status = NS_MODULE_PARTIAL;
+    }
     return merged;
 }
 

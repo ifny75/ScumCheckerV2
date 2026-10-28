@@ -23,6 +23,9 @@ struct NsModuleReport {
     wchar_t name[64];
     int status;
     int errors;
+    int roots_limited;
+    int depth_limited_directories;
+    int excluded_directories;
 };
 
 enum NsSeverity : int {
@@ -56,6 +59,8 @@ struct NsReport {
     int elapsed_ms;
     int modules_returned;
     NsModuleReport modules[16];
+    int findings_total;
+    int findings_truncated;
 };
 
 __declspec(dllexport) BOOL __stdcall Ns_IsAdministrator();

@@ -30,6 +30,9 @@ struct ModuleOutput {
     int registry_values_checked = 0;
     int steam_accounts_checked = 0;
     int errors = 0;
+    int roots_limited = 0;
+    int depth_limited_directories = 0;
+    int excluded_directories = 0;
 };
 
 std::wstring ToLowerCopy(const std::wstring& value);

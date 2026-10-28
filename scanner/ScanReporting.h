@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ScannerShared.h"
+#include <algorithm>
 
 namespace ns {
 
@@ -20,6 +21,9 @@ inline void MergeModuleOutput(const wchar_t* name, const ModuleOutput& output,
         WriteBounded(module.name, std::size(module.name), name);
         module.status = status;
         module.errors = output.errors;
+        module.roots_limited = output.roots_limited;
+        module.depth_limited_directories = output.depth_limited_directories;
+        module.excluded_directories = output.excluded_directories;
     } else {
         ++report.errors;
     }
@@ -34,6 +38,17 @@ inline ModuleOutput FailedModule() {
     output.status = NS_MODULE_FAILED;
     output.errors = 1;
     return output;
+}
+
+inline int CopyScanFindings(const std::vector<NsFinding>& findings, NsFinding* buffer,
+                           int capacity, NsReport& report) {
+    if (capacity < 0 || (capacity > 0 && !buffer)) return NS_STATUS_INVALID_ARGUMENT;
+    report.findings_total = static_cast<int>(findings.size());
+    report.findings_returned = (std::min)(capacity, report.findings_total);
+    if (report.findings_returned) std::copy_n(findings.begin(), report.findings_returned, buffer);
+    report.findings_truncated = report.findings_total - report.findings_returned;
+    if (report.findings_truncated && report.status == NS_STATUS_OK) report.status = NS_STATUS_PARTIAL;
+    return report.status;
 }
 
 } // namespace ns

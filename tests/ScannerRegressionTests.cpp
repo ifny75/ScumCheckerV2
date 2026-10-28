@@ -2,6 +2,7 @@
 #include "RiskAnalyzer.h"
 #include "ProcessModuleEnumerator.h"
 #include "ScanReporting.h"
+#include "ScanRunner.h"
 #include <Psapi.h>
 
 #include <algorithm>
@@ -183,6 +184,56 @@ void TestModuleReporting() {
     ns::MergeModuleOutput(L"After fatal error", output, report, findings);
     Require(report.status == NS_STATUS_INTERNAL_ERROR, "Fatal error was overwritten");
 }
+
+void TestExplicitFileScanLimits() {
+    Fixture fixture;
+    std::ofstream(fixture.root / L"first.json") << "{}";
+    std::ofstream(fixture.root / L"second.json") << "{}";
+    std::ofstream(fixture.root / L"nested" / L"third.json") << "{}";
+    const std::vector<std::wstring> roots = {fixture.root.wstring()};
+    const auto entries = ns::RunFileScanner({}, roots, {5, 1});
+    Require(entries.roots_limited == 1 && entries.status == NS_MODULE_PARTIAL,
+        "Entry limit silently reported a complete scan");
+    const auto depth = ns::RunFileScanner({}, roots, {0, 35000});
+    Require(depth.depth_limited_directories == 1 && depth.status == NS_MODULE_PARTIAL,
+        "Depth limit silently reported a complete scan");
+    std::filesystem::create_directory(fixture.root / L"cache");
+    const auto excluded = ns::RunFileScanner({}, roots);
+    Require(excluded.excluded_directories == 1 && excluded.status == NS_MODULE_PARTIAL,
+        "Excluded directory was not reported");
+    const auto missing = ns::RunFileScanner({}, {(fixture.root / L"missing").wstring()});
+    Require(missing.errors > 0 && missing.status == NS_MODULE_PARTIAL,
+        "Unavailable root silently reported a complete scan");
+    NsReport report{};
+    std::vector<NsFinding> findings;
+    ns::MergeModuleOutput(L"Files", excluded, report, findings);
+    Require(report.modules[0].excluded_directories == 1 && report.status == NS_STATUS_PARTIAL,
+        "Coverage limits were lost from the scan report");
+}
+
+void TestResultBufferTruncation() {
+    std::vector<NsFinding> findings(5001);
+    for (size_t i = 0; i < findings.size(); ++i) findings[i].score = static_cast<int>(i);
+    std::vector<NsFinding> buffer(4096);
+    NsReport report{};
+    Require(ns::CopyScanFindings(findings, buffer.data(), 4096, report) == NS_STATUS_PARTIAL,
+        "Truncated result silently reported success");
+    Require(report.findings_total == 5001 && report.findings_returned == 4096 && report.findings_truncated == 905,
+        "Incorrect truncation counts");
+    Require(buffer.back().score == 4095, "Result buffer was copied incorrectly");
+    buffer.resize(findings.size());
+    report = {};
+    Require(ns::CopyScanFindings(findings, buffer.data(), 5001, report) == NS_STATUS_OK &&
+        report.findings_returned == 5001 && report.findings_truncated == 0 && buffer.back().score == 5000,
+        "Results above 4096 could not be retained");
+    report = {};
+    Require(ns::CopyScanFindings(findings, nullptr, 0, report) == NS_STATUS_PARTIAL && report.findings_truncated == 5001,
+        "Zero capacity did not report omitted findings");
+    Require(Ns_RunSteamScan(nullptr, 1, &report) == NS_STATUS_INVALID_ARGUMENT,
+        "Null result buffer was accepted");
+    Require(Ns_RunSteamScan(nullptr, 0, nullptr) == NS_STATUS_INVALID_ARGUMENT,
+        "Null report was accepted");
+}
 }
 
 int main() {
@@ -195,6 +246,8 @@ int main() {
         TestLiveModuleSnapshot();
         TestFullFileHashes();
         TestModuleReporting();
+        TestExplicitFileScanLimits();
+        TestResultBufferTruncation();
         std::cout << "Scanner regressions passed\n";
         return 0;
     } catch (const std::exception& ex) {
