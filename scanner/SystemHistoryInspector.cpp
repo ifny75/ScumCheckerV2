@@ -3,6 +3,7 @@
 #endif
 
 #include "SystemHistoryInspector.h"
+#include "DriverIndicators.h"
 
 #include <Windows.h>
 #include <winternl.h>
@@ -169,12 +170,13 @@ void ScanBamHistory(const ns::RuleSet& rules, ns::ModuleOutput& out) {
                 const bool keyword = ns::ContainsAnyNeedle(lower, rules.strings);
                 const bool userspace = ns::IsUserSpacePath(lower);
                 const bool recent = IsRecentDays(ft, 7);
+                const bool signedOk = ns::VerifyFileSignature(ns::NormalizeDriverPath(path));
 
                 int degree = NS_SEVERITY_INFO; int score = 5;
                 std::wstring reason = L"Program execution recorded by BAM";
-                if (keyword) { degree = NS_SEVERITY_HIGH; score = 88; reason = L"Executed binary name matched a cheat keyword"; }
-                else if (userspace && recent) { degree = NS_SEVERITY_MEDIUM; score = 60; reason = L"Recently executed binary from appdata/temp"; }
-                else if (userspace) { degree = NS_SEVERITY_LOW; score = 30; reason = L"Executed binary from appdata/temp"; }
+                if (!signedOk && keyword) { degree = NS_SEVERITY_HIGH; score = 88; reason = L"Executed binary name matched a cheat keyword"; }
+                else if (!signedOk && userspace && recent) { degree = NS_SEVERITY_MEDIUM; score = 60; reason = L"Recently executed binary from appdata/temp"; }
+                else if (!signedOk && userspace) { degree = NS_SEVERITY_LOW; score = 30; reason = L"Executed binary from appdata/temp"; }
 
                 ns::PushFinding(out.findings, L"ExecHistory", path, reason,
                     L"lastRun=" + when + (recent ? L" | recent(7d)" : L""),

@@ -195,6 +195,8 @@ void ScanIfeo(HKEY root, REGSAM sam, const ns::RuleSet& rules, ns::ModuleOutput&
         auto debugger = ns::QueryStringValue(app, L"Debugger");
         RegCloseKey(app);
         if (!debugger.has_value()) continue;
+        const auto debuggerPath = ns::TrimQuotesAndArgs(ns::ExpandEnvironment(*debugger));
+        if (ns::VerifyFileSignature(debuggerPath)) continue;
 
         ns::PushFinding(
             out.findings,
