@@ -89,6 +89,11 @@
         </div>
       </section>
 
+      <details class="scan-report hidden" id="scanReport" aria-live="polite">
+        <summary id="scanReportSummary"></summary>
+        <div id="scanReportModules"></div>
+      </details>
+
       <section class="page active" id="page-dashboard">
         <section class="action-grid">
           <button class="action-card scan-action" data-mode="full" type="button">
@@ -321,6 +326,7 @@
     </section>
   </main>
 
+  <script src="./scan-report.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

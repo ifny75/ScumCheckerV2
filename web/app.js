@@ -7,6 +7,7 @@ const state = {
   findingsPageSize: 100,
   findingsFiltersOpen: false,
   lastFindings: [],
+  scanReports: {},
   scanQueue: [],
   scanBusy: false,
   currentMode: null,
@@ -450,6 +451,8 @@ function selectProfile(profileId) {
 
   state.activeProfile = profile.id;
   state.lastFindings = [];
+  state.scanReports = {};
+  renderScanReports();
   state.steamProfiles = {};
   state.scanQueue = [];
   state.scanBusy = false;
@@ -1211,12 +1214,32 @@ function renderAstryxStatus() {
   const text = document.querySelector("#astryxProgressText");
   const status = document.querySelector("#astryxStatus");
   if (!fill || !text || !status) return;
-  const percent = state.scanBusy ? Math.max(8, state.progressValue) : (visibleFindings().length ? 100 : 0);
+  const incomplete = Object.values(state.scanReports).some(result => !ScanReport.isComplete(result));
+  const percent = state.scanBusy ? Math.max(8, state.progressValue) : (incomplete ? 0 : (visibleFindings().length ? 100 : 0));
   fill.style.width = `${percent}%`;
   text.textContent = `${Math.round(percent)}%`;
   status.textContent = state.scanBusy
     ? t("astryx.status.working")
-    : (visibleFindings().length ? t("astryx.status.ready") : t("astryx.status.waiting"));
+    : (incomplete ? ScanReport.label({ status: 3 }, state.lang)
+      : (visibleFindings().length ? t("astryx.status.ready") : t("astryx.status.waiting")));
+}
+
+function renderScanReports() {
+  const panel = document.querySelector("#scanReport");
+  const entries = Object.entries(state.scanReports);
+  panel.classList.toggle("hidden", !entries.length);
+  if (!entries.length) return;
+  const incomplete = entries.filter(([, result]) => !ScanReport.isComplete(result)).length;
+  panel.classList.toggle("incomplete", incomplete > 0);
+  document.querySelector("#scanReportSummary").textContent = state.lang === "en"
+    ? `Scan stages: ${entries.length}; incomplete: ${incomplete}`
+    : `Этапов проверки: ${entries.length}; неполных: ${incomplete}`;
+  document.querySelector("#scanReportModules").innerHTML = entries.map(([mode, result]) => {
+    const modules = (result.report?.modules || []).map(module =>
+      `${module.name}: ${ScanReport.moduleLabel(module.status, state.lang)} (${module.errors || 0})`);
+    const details = result.message || modules.join("; ");
+    return `<p><strong>${escapeHtml(mode)}: ${escapeHtml(ScanReport.label(result, state.lang))}</strong><br>${escapeHtml(details)}</p>`;
+  }).join("");
 }
 
 function renderDashboard() {
@@ -1273,18 +1296,26 @@ function receive(message) {
       finishScanStep(false);
       break;
     case "scanError":
+      state.scanReports[state.currentMode || "full"] = message;
+      renderScanReports();
       setStatus(message.message || "Scan failed.");
       finishScanStep(false);
+      renderAstryxStatus();
       break;
     case "scanResult": {
       const mode = message.mode || state.currentMode || "full";
+      state.scanReports[mode] = message;
+      renderScanReports();
       state.completedModes.add(mode);
       mergeFindings(mode, message.findings || []);
       if (groupHasData(mode)) state.autoRetryCount[mode] = 0;
       updateStats(message.report);
       renderAllData();
-      setStatus(`Done: ${mode}, ${message.findings?.length || 0} returned.`);
-      finishScanStep(true);
+      const complete = ScanReport.isComplete(message);
+      setStatus(`${ScanReport.label(message, state.lang)}: ${mode}, ${message.findings?.length || 0}.`);
+      finishScanStep(complete);
+      if (!complete && !state.scanBusy) setProgress(0, ScanReport.label(message, state.lang));
+      renderAstryxStatus();
       refreshActivePageIfEmpty();
       break;
     }
@@ -1480,6 +1511,7 @@ function applyLanguage(lang) {
 
   applyAdminText();
   applyProfileTitles();
+  renderScanReports();
   renderAstryxView();
 }
 

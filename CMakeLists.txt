@@ -54,6 +54,7 @@ add_library(scum_scanner STATIC
     scanner/SystemHistoryInspector.h
     scanner/RiskAnalyzer.cpp
     scanner/RiskAnalyzer.h
+    scanner/ScanReporting.h
 )
 
 target_compile_definitions(scum_scanner PRIVATE
@@ -72,6 +73,10 @@ if (BUILD_TESTING)
     target_compile_options(scanner_regression_tests PRIVATE /EHsc /utf-8)
     target_link_libraries(scanner_regression_tests PRIVATE scum_scanner)
     add_test(NAME scanner_regressions COMMAND scanner_regression_tests)
+    find_program(NODE_EXECUTABLE node)
+    if (NODE_EXECUTABLE)
+        add_test(NAME scan_report_regressions COMMAND "${NODE_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tests/ScanReportTests.cjs")
+    endif()
 endif()
 
 # --- Embed the web UI (html/css/js/svg/png/...) into the executable ------------

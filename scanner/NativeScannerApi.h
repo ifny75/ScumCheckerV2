@@ -7,7 +7,22 @@ extern "C" {
 enum NsStatus : int {
     NS_STATUS_OK = 0,
     NS_STATUS_INVALID_ARGUMENT = 1,
-    NS_STATUS_INTERNAL_ERROR = 2
+    NS_STATUS_INTERNAL_ERROR = 2,
+    NS_STATUS_PARTIAL = 3
+};
+
+enum NsModuleStatus : int {
+    NS_MODULE_COMPLETED = 0,
+    NS_MODULE_PARTIAL = 1,
+    NS_MODULE_FAILED = 2,
+    NS_MODULE_ACCESS_DENIED = 3,
+    NS_MODULE_SKIPPED = 4
+};
+
+struct NsModuleReport {
+    wchar_t name[64];
+    int status;
+    int errors;
 };
 
 enum NsSeverity : int {
@@ -39,6 +54,8 @@ struct NsReport {
     int errors;
     int ran_as_admin;
     int elapsed_ms;
+    int modules_returned;
+    NsModuleReport modules[16];
 };
 
 __declspec(dllexport) BOOL __stdcall Ns_IsAdministrator();

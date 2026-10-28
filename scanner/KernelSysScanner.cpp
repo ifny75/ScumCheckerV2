@@ -555,6 +555,7 @@ ModuleOutput RunKernelSysScanner(const RuleSet& rules, bool isAdmin) {
     ModuleOutput out;
 
     if (!isAdmin) {
+        out.status = NS_MODULE_ACCESS_DENIED;
         PushFinding(
             out.findings,
             L"KernelProvider",
@@ -570,6 +571,7 @@ ModuleOutput RunKernelSysScanner(const RuleSet& rules, bool isAdmin) {
 
     const auto driverPath = ResolveSystemInformerDriverPath();
     if (!std::filesystem::exists(driverPath)) {
+        out.status = NS_MODULE_SKIPPED;
         PushFinding(
             out.findings,
             L"KernelProvider",
@@ -587,6 +589,7 @@ ModuleOutput RunKernelSysScanner(const RuleSet& rules, bool isAdmin) {
     bool createdService = false;
     const DWORD startError = EnsureDriverServiceRunning(driverPath, &createdService);
     if (startError != ERROR_SUCCESS) {
+        out.status = NS_MODULE_FAILED;
         PushFinding(
             out.findings,
             L"KernelProvider",
@@ -604,6 +607,7 @@ ModuleOutput RunKernelSysScanner(const RuleSet& rules, bool isAdmin) {
     const bool loaded = IsSystemInformerLoaded(&loadedName);
     std::wstring portError;
     const bool portOk = TryConnectKphPort(&portError);
+    if (!portOk || !signedOk) out.status = NS_MODULE_PARTIAL;
 
     PushFinding(
         out.findings,

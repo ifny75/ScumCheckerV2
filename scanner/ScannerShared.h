@@ -21,6 +21,7 @@ struct RuleSet {
 };
 
 struct ModuleOutput {
+    int status = NS_MODULE_COMPLETED;
     std::vector<NsFinding> findings;
     int files_checked = 0;
     int services_checked = 0;

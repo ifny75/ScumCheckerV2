@@ -40,7 +40,7 @@ void CheckSecureBoot(const ns::RuleSet& /*rules*/, ns::ModuleOutput& out) {
         HKEY_LOCAL_MACHINE,
         L"SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State",
         L"UEFISecureBootEnabled");
-    if (!state.has_value()) return; // legacy BIOS / unreadable — stay silent
+    if (!state.has_value()) { out.status = NS_MODULE_PARTIAL; return; }
     ++out.registry_values_checked;
 
     if (*state == 1) {
@@ -72,12 +72,13 @@ void CheckCodeSigningEnforcement(const ns::RuleSet& /*rules*/, ns::ModuleOutput&
     HKEY control = nullptr;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
             L"SYSTEM\\CurrentControlSet\\Control", 0, KEY_READ, &control) != ERROR_SUCCESS) {
+        out.status = NS_MODULE_PARTIAL;
         return;
     }
     const auto opts = ns::QueryStringValue(control, L"SystemStartOptions");
     RegCloseKey(control);
 
-    if (!opts.has_value()) return;
+    if (!opts.has_value()) { out.status = NS_MODULE_PARTIAL; return; }
     ++out.registry_values_checked;
 
     const auto lower = ns::ToLowerCopy(*opts);
@@ -131,7 +132,7 @@ void CheckVulnerableDriverBlocklist(const ns::RuleSet& /*rules*/, ns::ModuleOutp
         HKEY_LOCAL_MACHINE,
         L"SYSTEM\\CurrentControlSet\\Control\\CI\\Config",
         L"VulnerableDriverBlocklistEnable");
-    if (!enabled.has_value()) return;
+    if (!enabled.has_value()) { out.status = NS_MODULE_PARTIAL; return; }
     ++out.registry_values_checked;
 
     if (*enabled == 0) {
@@ -153,6 +154,7 @@ void CheckDefender(const ns::RuleSet& /*rules*/, ns::ModuleOutput& out) {
         HKEY_LOCAL_MACHINE,
         L"SOFTWARE\\Microsoft\\Windows Defender\\Real-Time Protection",
         L"DisableRealtimeMonitoring");
+    if (!rtDisabled.has_value()) out.status = NS_MODULE_PARTIAL;
     if (rtDisabled.has_value()) {
         ++out.registry_values_checked;
         if (*rtDisabled == 1) {
@@ -172,6 +174,7 @@ void CheckDefender(const ns::RuleSet& /*rules*/, ns::ModuleOutput& out) {
         HKEY_LOCAL_MACHINE,
         L"SOFTWARE\\Microsoft\\Windows Defender\\Features",
         L"TamperProtection");
+    if (!tamper.has_value()) out.status = NS_MODULE_PARTIAL;
     if (tamper.has_value()) {
         ++out.registry_values_checked;
         // 5 = enabled, anything else (commonly 0/4) = off/disabled.
@@ -194,7 +197,7 @@ void CheckVbsHvci(const ns::RuleSet& /*rules*/, ns::ModuleOutput& out) {
         HKEY_LOCAL_MACHINE,
         L"SYSTEM\\CurrentControlSet\\Control\\DeviceGuard\\Scenarios\\HypervisorEnforcedCodeIntegrity",
         L"Enabled");
-    if (!hvci.has_value()) return;
+    if (!hvci.has_value()) { out.status = NS_MODULE_PARTIAL; return; }
     ++out.registry_values_checked;
 
     if (*hvci == 1) {
@@ -227,6 +230,7 @@ namespace ns {
 ModuleOutput RunSecurityConfigScanner(const RuleSet& rules, bool isAdmin) {
     ModuleOutput out;
     if (!isAdmin) {
+        out.status = NS_MODULE_PARTIAL;
         PushFinding(
             out.findings,
             L"SecurityConfig",

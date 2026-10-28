@@ -364,7 +364,14 @@ std::wstring ScanResultJson(
          << L"\"errors\":" << report.errors << L","
          << L"\"ranAsAdmin\":" << (report.ran_as_admin ? L"true" : L"false") << L","
          << L"\"elapsedMs\":" << report.elapsed_ms
-         << L"},\"findings\":[";
+         << L",\"modules\":[";
+    for (int i = 0; i < report.modules_returned; ++i) {
+        if (i) json << L",";
+        const auto& module = report.modules[i];
+        json << L"{\"name\":" << JsonString(module.name)
+             << L",\"status\":" << module.status << L",\"errors\":" << module.errors << L"}";
+    }
+    json << L"]},\"findings\":[";
 
     for (size_t i = 0; i < findings.size(); ++i) {
         if (i != 0) json << L",";

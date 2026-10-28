@@ -182,6 +182,7 @@ namespace ns {
 ModuleOutput RunDriverScanner(const RuleSet& rules, bool isAdmin) {
     ModuleOutput out;
     if (!isAdmin) {
+        out.status = NS_MODULE_PARTIAL;
         PushFinding(
             out.findings,
             L"Driver",

@@ -14,6 +14,7 @@
 #include "ProcessScanner.h"
 #include "RegistryScanner.h"
 #include "RiskAnalyzer.h"
+#include "ScanReporting.h"
 #include "ScannerShared.h"
 #include "SecurityConfigScanner.h"
 #include "SteamScanner.h"
@@ -51,16 +52,8 @@ bool IsAdmin() {
     return isMember == TRUE;
 }
 
-void MergeOutput(const ns::ModuleOutput& mo, NsReport* report, std::vector<NsFinding>* findings) {
-    report->files_checked += mo.files_checked;
-    report->drivers_checked += mo.drivers_checked;
-    report->services_checked += mo.services_checked;
-    report->processes_checked += mo.processes_checked;
-    report->registry_values_checked += mo.registry_values_checked;
-    report->steam_accounts_checked += mo.steam_accounts_checked;
-    report->errors += mo.errors;
-
-    findings->insert(findings->end(), mo.findings.begin(), mo.findings.end());
+void MergeOutput(const wchar_t* name, const ns::ModuleOutput& mo, NsReport* report, std::vector<NsFinding>* findings) {
+    ns::MergeModuleOutput(name, mo, *report, *findings);
 }
 
 std::wstring ResolveRulesPath() {
@@ -105,6 +98,7 @@ int RunSingleModuleScan(
     NsFinding* findings_buffer,
     int findings_capacity,
     NsReport* out_report,
+    const wchar_t* moduleName,
     Fn&& module) {
     if (!out_report || findings_capacity < 0) {
         return NS_STATUS_INVALID_ARGUMENT;
@@ -121,9 +115,9 @@ int RunSingleModuleScan(
         const auto rulesPath = ResolveRulesPath();
         const auto rules = ns::LoadRulesFromJson(rulesPath);
         auto mo = module(rules);
-        MergeOutput(mo, out_report, &findings);
+        MergeOutput(moduleName, mo, out_report, &findings);
     } catch (...) {
-        out_report->errors++;
+        MergeOutput(moduleName, ns::FailedModule(), out_report, &findings);
         out_report->status = NS_STATUS_INTERNAL_ERROR;
     }
 
@@ -171,12 +165,15 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunDriverMemoryScan(
         jobs.emplace_back(std::async(std::launch::async, [&rules]() { return ns::RunHypervisorScanner(rules); }));
         jobs.emplace_back(std::async(std::launch::async, [&rules]() { return ns::RunSystemHistoryInspector(rules); }));
 
+        const wchar_t* names[] = {L"Files", L"Processes", L"Drivers", L"Registry", L"Steam", L"PCIe", L"Hypervisor", L"History"};
+        size_t index = 0;
         for (auto& job : jobs) {
+            const auto name = names[index++];
             try {
                 auto mo = job.get();
-                MergeOutput(mo, out_report, &findings);
+                MergeOutput(name, mo, out_report, &findings);
             } catch (...) {
-                out_report->errors++;
+                MergeOutput(name, ns::FailedModule(), out_report, &findings);
             }
         }
 
@@ -192,7 +189,7 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunSteamScan(
     NsFinding* findings_buffer,
     int findings_capacity,
     NsReport* out_report) {
-    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report,
+    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report, L"Steam",
         [](const ns::RuleSet& rules) { return ns::RunSteamScanner(rules); });
 }
 
@@ -200,7 +197,7 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunHistoryScan(
     NsFinding* findings_buffer,
     int findings_capacity,
     NsReport* out_report) {
-    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report,
+    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report, L"History",
         [](const ns::RuleSet& rules) { return ns::RunSystemHistoryInspector(rules); });
 }
 
@@ -209,7 +206,7 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunSecurityConfigScan(
     int findings_capacity,
     NsReport* out_report) {
     const bool isAdmin = IsAdmin();
-    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report,
+    return RunSingleModuleScan(findings_buffer, findings_capacity, out_report, L"Security configuration",
         [isAdmin](const ns::RuleSet& rules) { return ns::RunSecurityConfigScanner(rules, isAdmin); });
 }
 
@@ -233,10 +230,10 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunDmaNetworkInspect(
         const auto rules = ns::LoadRulesFromJson(rulesPath);
 
         auto mo = ns::RunDmaNetworkInspector(rules);
-        MergeOutput(mo, out_report, &findings);
+        MergeOutput(L"DMA / Network", mo, out_report, &findings);
 
         auto hist = ns::RunSystemHistoryInspector(rules);
-        MergeOutput(hist, out_report, &findings);
+        MergeOutput(L"History", hist, out_report, &findings);
 
     } catch (...) {
         out_report->errors++;
@@ -268,7 +265,7 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunKernelSysScan(
 
         const bool isAdmin = out_report->ran_as_admin == 1;
         auto kernel = ns::RunKernelSysScanner(rules, isAdmin);
-        MergeOutput(kernel, out_report, &findings);
+        MergeOutput(L"Kernel provider", kernel, out_report, &findings);
 
         std::vector<std::future<ns::ModuleOutput>> jobs;
         jobs.emplace_back(std::async(std::launch::async, [&rules]() { return ns::RunProcessScanner(rules); }));
@@ -277,12 +274,15 @@ extern "C" __declspec(dllexport) int __stdcall Ns_RunKernelSysScan(
         jobs.emplace_back(std::async(std::launch::async, [&rules]() { return ns::RunHypervisorScanner(rules); }));
         jobs.emplace_back(std::async(std::launch::async, [&rules, isAdmin]() { return ns::RunSecurityConfigScanner(rules, isAdmin); }));
 
+        const wchar_t* names[] = {L"Processes", L"Drivers", L"PCIe", L"Hypervisor", L"Security configuration"};
+        size_t index = 0;
         for (auto& job : jobs) {
+            const auto name = names[index++];
             try {
                 auto mo = job.get();
-                MergeOutput(mo, out_report, &findings);
+                MergeOutput(name, mo, out_report, &findings);
             } catch (...) {
-                out_report->errors++;
+                MergeOutput(name, ns::FailedModule(), out_report, &findings);
             }
         }
     } catch (...) {

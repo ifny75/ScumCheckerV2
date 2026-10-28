@@ -1,6 +1,7 @@
 #include "FileScanner.h"
 #include "RiskAnalyzer.h"
 #include "ProcessModuleEnumerator.h"
+#include "ScanReporting.h"
 #include <Psapi.h>
 
 #include <algorithm>
@@ -156,6 +157,32 @@ void TestFullFileHashes() {
     CloseHandle(locked);
     Require(hash.empty(), "Unreadable file returned a hash");
 }
+
+void TestModuleReporting() {
+    NsReport report{};
+    std::vector<NsFinding> findings;
+    ns::ModuleOutput output;
+    ns::MergeModuleOutput(L"Completed", output, report, findings);
+    Require(report.status == NS_STATUS_OK && report.modules_returned == 1,
+        "Successful module marked incomplete");
+    output.errors = 2;
+    ns::MergeModuleOutput(L"Partial", output, report, findings);
+    Require(report.status == NS_STATUS_PARTIAL && report.modules[1].status == NS_MODULE_PARTIAL,
+        "Module errors did not mark scan incomplete");
+    ns::MergeModuleOutput(L"Failed", ns::FailedModule(), report, findings);
+    Require(report.modules[2].status == NS_MODULE_FAILED && report.errors == 3,
+        "Failed module was not reported");
+    output = {};
+    output.status = NS_MODULE_ACCESS_DENIED;
+    ns::MergeModuleOutput(L"Denied", output, report, findings);
+    Require(report.modules[3].status == NS_MODULE_ACCESS_DENIED,
+        "Access denied status lost");
+    ns::MergeModuleOutput(L"Completed later", ns::ModuleOutput{}, report, findings);
+    Require(report.status == NS_STATUS_PARTIAL, "Later success hid an earlier failure");
+    report.status = NS_STATUS_INTERNAL_ERROR;
+    ns::MergeModuleOutput(L"After fatal error", output, report, findings);
+    Require(report.status == NS_STATUS_INTERNAL_ERROR, "Fatal error was overwritten");
+}
 }
 
 int main() {
@@ -167,6 +194,7 @@ int main() {
         TestIncompleteModuleSnapshots();
         TestLiveModuleSnapshot();
         TestFullFileHashes();
+        TestModuleReporting();
         std::cout << "Scanner regressions passed\n";
         return 0;
     } catch (const std::exception& ex) {

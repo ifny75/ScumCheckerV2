@@ -1506,6 +1506,18 @@ input { font: inherit; }
 
 .risk-dot:hover + .node-tip,
 .risk-dot:focus + .node-tip,
+.scan-report {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 12px;
+  background: rgba(4, 8, 16, .85);
+  overflow-wrap: anywhere;
+}
+.scan-report summary { cursor: pointer; }
+.scan-report.incomplete { border-color: #e4ad50; color: #f1ca86; }
+.scan-report p { margin: 10px 0; }
+
 .astryx-node:hover .node-tip,
 .astryx-node:focus-within .node-tip {
   opacity: 1;
