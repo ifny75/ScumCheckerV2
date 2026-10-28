@@ -1237,18 +1237,12 @@ function renderScanReports() {
     ? `Scan stages: ${entries.length}; incomplete: ${incomplete}`
     : `Этапов проверки: ${entries.length}; неполных: ${incomplete}`;
   document.querySelector("#scanReportModules").innerHTML = entries.map(([mode, result]) => {
-    const ru = state.lang !== "en";
-    const modules = (result.report?.modules || []).map(module => {
-      const coverage = ru
-        ? `лимит объектов: ${module.rootsLimited || 0}, лимит глубины: ${module.depthLimitedDirectories || 0}, исключено папок: ${module.excludedDirectories || 0}`
-        : `entry limit: ${module.rootsLimited || 0}, depth limit: ${module.depthLimitedDirectories || 0}, excluded directories: ${module.excludedDirectories || 0}`;
-      return `${module.name}: ${ScanReport.moduleLabel(module.status, state.lang)} (${module.errors || 0}); ${coverage}`;
-    });
-    const totals = ru
-      ? `Находок: ${result.report?.findingsTotal || 0}; не передано: ${result.report?.findingsTruncated || 0}. `
-      : `Findings: ${result.report?.findingsTotal || 0}; omitted: ${result.report?.findingsTruncated || 0}. `;
-    const details = totals + (result.message || modules.join("; "));
-    return `<p><strong>${escapeHtml(mode)}: ${escapeHtml(ScanReport.label(result, state.lang))}</strong><br>${escapeHtml(details)}</p>`;
+    const count = result.report?.findingsTotal ?? result.findings?.length ?? 0;
+    const title = `${ScanReport.modeLabel(mode, state.lang)}: ${ScanReport.label(result, state.lang)}`;
+    const countText = state.lang === "en" ? `Findings: ${count}` : `Находок: ${count}`;
+    const issues = ScanReport.issues(result, state.lang);
+    const notes = issues.length ? `<ul>${issues.map(note => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : "";
+    return `<div class="scan-report-row"><div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(countText)}</span></div>${notes}</div>`;
   }).join("");
 }
 
@@ -1300,7 +1294,7 @@ function receive(message) {
       break;
     case "scanStarted":
       state.resultChunks[message.mode] = ScanReport.beginChunks(message.profile, message.mode);
-      setStatus(`Scanning ${message.profile} (${message.mode})...`);
+      setStatus(`${ScanReport.modeLabel(message.mode, state.lang)}…`);
       break;
     case "scanChunk":
       ScanReport.appendChunk(state.resultChunks[message.mode], message);
@@ -1329,7 +1323,8 @@ function receive(message) {
       updateStats(message.report);
       renderAllData();
       const complete = ScanReport.isComplete(message);
-      setStatus(`${ScanReport.label(message, state.lang)}: ${mode}, ${message.findings?.length || 0}.`);
+      const count = message.findings?.length || 0;
+      setStatus(`${ScanReport.modeLabel(mode, state.lang)} · ${ScanReport.label(message, state.lang)} · ${state.lang === "en" ? "Findings" : "Находок"}: ${count}`);
       finishScanStep(complete);
       if (!complete && !state.scanBusy) setProgress(0, ScanReport.label(message, state.lang));
       renderAstryxStatus();

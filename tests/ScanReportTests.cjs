@@ -35,3 +35,16 @@ assert.equal(report.isComplete(report.finishChunks(null, result)), false);
 const empty = { profile: "scum", mode: "full", status: 0, report: { findingsReturned: 0 } };
 assert.equal(report.isComplete(report.finishChunks(report.beginChunks("scum", "full"), empty)), true);
 console.log("Chunk delivery regressions passed");
+
+assert.deepEqual(report.issues({ status: 0, report: { modules: [
+  { name: "Processes", status: 0, errors: 0, rootsLimited: 0, depthLimitedDirectories: 0, excludedDirectories: 0 }
+] } }), []);
+assert.equal(report.modeLabel("full"), "Основная проверка");
+const notes = report.issues({ status: 3, report: { modules: [
+  { name: "Files", status: 1, errors: 2, rootsLimited: 1, excludedDirectories: 0 }
+] } });
+assert.equal(notes.length, 1);
+assert.ok(notes[0].startsWith("Файлы:"));
+assert.ok(!notes[0].includes("исключено папок"));
+assert.ok(notes[0].includes("ошибок: 2"));
+console.log("Compact report regressions passed");

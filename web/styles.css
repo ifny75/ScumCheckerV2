@@ -1506,21 +1506,6 @@ input { font: inherit; }
 
 .risk-dot:hover + .node-tip,
 .risk-dot:focus + .node-tip,
-.scan-report {
-  grid-column: 1 / -1;
-  max-height: 30vh;
-  overflow: auto;
-  margin: 12px 0;
-  padding: 12px 16px;
-  border: 1px solid rgba(255, 255, 255, .25);
-  border-radius: 12px;
-  background: rgba(4, 8, 16, .85);
-  overflow-wrap: anywhere;
-}
-.scan-report summary { cursor: pointer; }
-.scan-report.incomplete { border-color: #e4ad50; color: #f1ca86; }
-.scan-report p { margin: 10px 0; }
-
 .astryx-node:hover .node-tip,
 .astryx-node:focus-within .node-tip {
   opacity: 1;
@@ -2525,3 +2510,37 @@ input { font: inherit; }
   transform: translateY(0) !important;
   pointer-events: auto;
 }
+
+/* Compact scan footer. The active page keeps the remaining workspace height. */
+.workspace { grid-template-rows: minmax(0, 1fr) auto; }
+.workspace > .page { grid-row: 1; grid-column: 1; }
+.workspace > .scan-strip {
+  grid-row: 2;
+  grid-column: 1;
+  min-width: 0;
+  font-size: 11px;
+  gap: 6px 12px;
+}
+.scan-strip .status-strip { font-size: 11px; overflow-wrap: anywhere; }
+.scan-strip .progress-line { font-size: 10px; }
+.scan-report {
+  grid-column: 1 / -1;
+  max-height: min(200px, 25vh);
+  overflow: auto;
+  margin: 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 6px;
+  background: rgba(4,8,16,.7);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.scan-report summary { cursor: pointer; color: var(--text); }
+.scan-report.incomplete summary { color: #e4bd78; }
+.scan-report-row { padding: 6px 0; border-top: 1px solid rgba(255,255,255,.08); }
+.scan-report-row:first-child { margin-top: 5px; }
+.scan-report-row > div { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.scan-report-row strong { font-weight: 500; color: var(--text); }
+.scan-report-row ul { margin: 3px 0 0; padding-left: 16px; }

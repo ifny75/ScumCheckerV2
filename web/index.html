@@ -78,21 +78,6 @@
         </button>
       </header>
 
-      <section class="scan-strip">
-        <div class="status-strip" id="statusStrip">Waiting for WebView bridge...</div>
-        <div class="scan-progress" id="scanProgress">
-          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-        </div>
-        <div class="progress-line">
-          <span id="progressStage">Idle</span>
-          <strong id="progressPercent">0%</strong>
-        </div>
-        <details class="scan-report hidden" id="scanReport" aria-live="polite">
-          <summary id="scanReportSummary"></summary>
-          <div id="scanReportModules"></div>
-        </details>
-      </section>
-
       <section class="page active" id="page-dashboard">
         <section class="action-grid">
           <button class="action-card scan-action" data-mode="full" type="button">
@@ -321,6 +306,21 @@
           <button class="tool-button hotkey-button" data-open="installed_apps" type="button"><img src="./assets/icons/icon_tools.png" alt="">Installed apps</button>
           <button class="tool-button hotkey-button" data-open="device_manager" type="button"><img src="./assets/icons/icon_path.png" alt="">Device Manager</button>
         </div>
+      </section>
+
+      <section class="scan-strip">
+        <div class="status-strip" id="statusStrip">Waiting for WebView bridge...</div>
+        <div class="scan-progress" id="scanProgress">
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+        <div class="progress-line">
+          <span id="progressStage">Idle</span>
+          <strong id="progressPercent">0%</strong>
+        </div>
+        <details class="scan-report hidden" id="scanReport" aria-live="polite">
+          <summary id="scanReportSummary"></summary>
+          <div id="scanReportModules"></div>
+        </details>
       </section>
     </section>
   </main>
