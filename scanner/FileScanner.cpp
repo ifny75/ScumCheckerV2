@@ -3,6 +3,7 @@
 #endif
 
 #include "FileScanner.h"
+#include "DriverIndicators.h"
 
 #include <Windows.h>
 
@@ -219,9 +220,9 @@ void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& 
 
             const auto dirLower = ns::ToLowerCopy(it->path().wstring());
             const auto dirName = ns::ToLowerCopy(it->path().filename().wstring());
-            if (ContainsCriticalToken(dirLower) ||
-                ns::ContainsAnyNeedle(dirLower, rules.strings) ||
-                ns::ContainsAnyNeedle(dirLower, rules.paths)) {
+            if (ContainsCriticalToken(dirName) ||
+                ns::ContainsAnyNeedle(dirName, rules.strings) ||
+                ContainsSpecificPathNeedle(dirLower, rules.paths)) {
                 const bool criticalDir = ContainsCriticalToken(dirName);
                 ns::PushFinding(out.findings, L"File",
                     criticalDir ? L"High-risk suspicious folder" : L"Suspicious folder",
@@ -276,6 +277,8 @@ void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& 
         const bool isExeDll = extLower == L".exe" || extLower == L".dll";
         const bool isSignable = isSys || isExeDll;
         const bool signedOk = isSignable ? ns::VerifyFileSignature(path) : false;
+        if (isSys && ns::ReportVulnerableDriverFile(path, L"File", out)) continue;
+        if (signedOk) continue;
 
         // Keyword match is taken on the FILE NAME only (not the full path), so
         // the appdata/temp roots themselves can no longer trigger it.
@@ -326,24 +329,6 @@ void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& 
                 path,
                 NS_SEVERITY_HIGH, userStaged ? 94 : 88);
             continue;
-        }
-
-        // 3.5) Signed .sys with a known leaked / abused signer. These are common
-        // BYOVD loader materials because Windows accepts the signature.
-        if (isSys && signedOk) {
-            const auto signer = ns::GetFileSignerInfo(path);
-            const auto leaked = ns::MatchKnownLeakedSigner(signer);
-            if (!leaked.empty()) {
-                ns::PushFinding(out.findings, L"File",
-                    L"Kernel driver signed with known leaked certificate",
-                    L"Signed .sys uses a leaked/abused code-signing certificate",
-                    L"Name=" + baseName + L" | Signature=Valid | Signer=" + signer.subject +
-                        L" | Serial=" + signer.serial + L" | Match=" + leaked,
-                    path,
-                    NS_SEVERITY_HIGH,
-                    97);
-                continue;
-            }
         }
 
         // 4) Cheat-keyword in the file name.

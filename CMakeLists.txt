@@ -36,6 +36,9 @@ add_library(scum_scanner STATIC
     scanner/ProcessModuleEnumerator.h
     scanner/DriverScanner.cpp
     scanner/DriverScanner.h
+    scanner/DriverIndicators.cpp
+    scanner/DriverIndicators.h
+    scanner/VulnerableDriverData.h
     scanner/RegistryScanner.cpp
     scanner/RegistryScanner.h
     scanner/SteamScanner.cpp

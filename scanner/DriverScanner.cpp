@@ -3,6 +3,7 @@
 #endif
 
 #include "DriverScanner.h"
+#include "DriverIndicators.h"
 
 #include <Windows.h>
 #include <Psapi.h>
@@ -26,10 +27,6 @@ void ScanLoadedDrivers(const ns::RuleSet& rules, ns::ModuleOutput& out) {
     const DWORD count = std::min<DWORD>(needed / sizeof(LPVOID), static_cast<DWORD>(drivers.size()));
     out.drivers_checked = static_cast<int>(count);
 
-    const std::unordered_set<std::wstring> vulnerableDrivers = {
-        L"iqvw64e.sys", L"gdrv.sys", L"dbk64.sys", L"capcom.sys", L"rtcore64.sys", L"winring0x64.sys", L"eneio64.sys"
-    };
-
     for (DWORD i = 0; i < count; ++i) {
         wchar_t baseName[MAX_PATH]{};
         if (GetDeviceDriverBaseNameW(drivers[i], baseName, static_cast<DWORD>(std::size(baseName))) == 0) {
@@ -37,19 +34,17 @@ void ScanLoadedDrivers(const ns::RuleSet& rules, ns::ModuleOutput& out) {
         }
 
         const auto lower = ns::ToLowerCopy(baseName);
-        const bool vulnerable = vulnerableDrivers.find(lower) != vulnerableDrivers.end();
+        wchar_t rawPath[2048]{};
+        GetDeviceDriverFileNameW(drivers[i], rawPath, static_cast<DWORD>(std::size(rawPath)));
+        const auto path = ns::NormalizeDriverPath(rawPath);
+        const bool fileExists = ns::PathExistsFile(path);
+        if (fileExists && ns::ReportVulnerableDriverFile(path, L"Driver", out)) continue;
+        if (fileExists && ns::VerifyFileSignature(path)) continue;
         const bool suspicious = ns::ContainsAnyNeedle(lower, rules.strings);
-
-        if (vulnerable) {
-            ns::PushFinding(
-                out.findings,
-                L"Driver",
-                L"Known vulnerable kernel driver",
-                L"Driver is commonly abused by cheat mappers/BYOVD",
-                baseName,
-                baseName,
-                NS_SEVERITY_HIGH,
-                95);
+        if (!fileExists && ns::IsKnownVulnerableDriverName(lower)) {
+            ns::PushFinding(out.findings, L"Driver", L"Driver family requires version verification",
+                L"Name matches a vulnerable driver family; file unavailable, vulnerability is not confirmed",
+                baseName, path, NS_SEVERITY_LOW, 35);
         } else if (suspicious) {
             ns::PushFinding(
                 out.findings,
@@ -57,7 +52,7 @@ void ScanLoadedDrivers(const ns::RuleSet& rules, ns::ModuleOutput& out) {
                 L"Suspicious loaded driver name",
                 L"Loaded driver name matched suspicious keywords",
                 baseName,
-                baseName,
+                path,
                 NS_SEVERITY_MEDIUM,
                 72);
         }
@@ -97,13 +92,7 @@ void ScanKernelDriverServices(const ns::RuleSet& rules, ns::ModuleOutput& out) {
         auto imagePathRaw = ns::QueryStringValue(oneService, L"ImagePath");
         std::wstring imagePath;
         if (imagePathRaw.has_value()) {
-            imagePath = ns::TrimQuotesAndArgs(*imagePathRaw);
-            if (!imagePath.empty() && imagePath.rfind(L"\\SystemRoot\\", 0) == 0) {
-                wchar_t winDir[MAX_PATH]{};
-                GetWindowsDirectoryW(winDir, static_cast<UINT>(std::size(winDir)));
-                imagePath = std::wstring(winDir) + imagePath.substr(11);
-            }
-            imagePath = ns::ExpandEnvironment(imagePath);
+            imagePath = ns::NormalizeDriverPath(*imagePathRaw);
         }
 
         auto serviceName = std::wstring(subkeyName);
@@ -113,6 +102,15 @@ void ScanKernelDriverServices(const ns::RuleSet& rules, ns::ModuleOutput& out) {
         bool signatureOk = false;
         if (!imagePath.empty() && ns::PathExistsFile(imagePath)) {
             signatureOk = ns::VerifyFileSignature(imagePath);
+        }
+
+        if (!imagePath.empty() && ns::PathExistsFile(imagePath)) {
+            ns::ReportVulnerableDriverFile(imagePath, L"DriverService", out);
+        }
+        if (signatureOk) {
+            RegCloseKey(oneService);
+            subkeyLen = static_cast<DWORD>(std::size(subkeyName));
+            continue;
         }
 
         if (suspiciousName) {
@@ -125,22 +123,6 @@ void ScanKernelDriverServices(const ns::RuleSet& rules, ns::ModuleOutput& out) {
                 imagePath,
                 NS_SEVERITY_HIGH,
                 90);
-        }
-
-        if (!imagePath.empty() && ns::PathExistsFile(imagePath)) {
-            const auto signer = ns::GetFileSignerInfo(imagePath);
-            const auto leaked = ns::MatchKnownLeakedSigner(signer);
-            if (!leaked.empty()) {
-                ns::PushFinding(
-                    out.findings,
-                    L"DriverService",
-                    L"Driver signed with known leaked certificate",
-                    L"Kernel driver is signed by a leaked/abused code-signing cert (" + leaked + L")",
-                    L"Service=" + serviceName + L" | Signer=" + signer.subject + L" | Serial=" + signer.serial,
-                    imagePath,
-                    NS_SEVERITY_HIGH,
-                    97);
-            }
         }
 
         if (!imagePath.empty()) {

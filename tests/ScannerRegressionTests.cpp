@@ -3,6 +3,7 @@
 #include "ProcessModuleEnumerator.h"
 #include "ScanReporting.h"
 #include "ScanRunner.h"
+#include "DriverIndicators.h"
 #include <Psapi.h>
 
 #include <algorithm>
@@ -234,6 +235,37 @@ void TestResultBufferTruncation() {
     Require(Ns_RunSteamScan(nullptr, 0, nullptr) == NS_STATUS_INVALID_ARGUMENT,
         "Null report was accepted");
 }
+
+void TestSignatureExemptionsAndDriverIndicators() {
+    Fixture fixture;
+    wchar_t system[MAX_PATH]{};
+    GetSystemDirectoryW(system, MAX_PATH);
+    const auto source = std::filesystem::path(system) / L"kernel32.dll";
+    Require(ns::VerifyFileSignature(source.wstring()), "Windows DLL signature was not trusted");
+    const auto copied = fixture.root / L"bypass-mapper-loader.dll";
+    std::filesystem::copy_file(source, copied);
+    Require(ns::VerifyFileSignature(copied.wstring()), "Copied signed DLL lost signature trust");
+    ns::RuleSet rules;
+    rules.strings = {L"bypass", L"mapper", L"loader"};
+    Require(ns::RunFileScanner(rules, {fixture.root.wstring()}).findings.empty(),
+        "Signed DLL was detected by filename keywords");
+    std::filesystem::copy_file(source, fixture.root / L"iqvw64e.sys");
+    Require(ns::RunFileScanner(rules, {fixture.root.wstring()}).findings.empty(),
+        "Signed file with a driver-family name was treated as a confirmed vulnerable version");
+    {
+        std::fstream corrupt(copied, std::ios::in | std::ios::out | std::ios::binary);
+        corrupt.put('Z');
+    }
+    Require(!ns::VerifyFileSignature(copied.wstring()), "Modified binary retained signature exemption");
+    Require(!ns::RunFileScanner(rules, {fixture.root.wstring()}).findings.empty(),
+        "Unsigned keyword sample was incorrectly exempted");
+    Require(!ns::MatchVulnerableDriverHash(
+        L"4429f32db1cc70567919d7d47b844a91cf1329a6cd116f582305f3b7b60cd60b").empty(),
+        "Known vulnerable Intel sample was absent from driver database");
+    Require(ns::MatchVulnerableDriverHash(std::wstring(64, L'0')).empty(), "Unknown hash matched driver database");
+    Require(ns::IsKnownVulnerableDriverName(L"C:\\drivers\\IQVW64E.SYS"), "Driver family lookup failed");
+    Require(!ns::IsKnownVulnerableDriverName(L"normal.sys"), "Unknown driver name matched database");
+}
 }
 
 int main() {
@@ -248,6 +280,7 @@ int main() {
         TestModuleReporting();
         TestExplicitFileScanLimits();
         TestResultBufferTruncation();
+        TestSignatureExemptionsAndDriverIndicators();
         std::cout << "Scanner regressions passed\n";
         return 0;
     } catch (const std::exception& ex) {

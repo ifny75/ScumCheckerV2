@@ -200,7 +200,7 @@ std::wstring DirOf(const std::wstring& path) {
 // Flag DLLs loaded into a process from outside its own install directory and
 // outside Windows — i.e. a foreign module injected via LoadLibrary. Skips the
 // host's own modules and system DLLs to stay quiet; flags foreign modules that
-// are unsigned or keyword-matched (legit signed overlays like Steam/Discord are
+// are unsigned (legit signed overlays like Steam/Discord are
 // left alone). Does NOT catch manual-mapped code — see DetectManualMappedRegions.
 void DetectSuspiciousModules(HANDLE hProc, DWORD pid, const std::wstring& hostDirLower,
                              const ns::RuleSet& rules, std::vector<NsFinding>& findings,
@@ -226,13 +226,12 @@ void DetectSuspiciousModules(HANDLE hProc, DWORD pid, const std::wstring& hostDi
         // Foreign module: flag unsigned modules, but keep generic unsigned
         // third-party modules below High. Many legit apps ship unsigned native
         // addons outside the host dir (Discord/ASUS/Node/Electron stacks).
-        if (!signedOk || keyword) {
+        if (!signedOk) {
             ns::PushFinding(
                 findings,
                 L"Process",
-                L"Foreign module injected into process",
-                signedOk ? L"Process loaded a foreign module matching cheat keywords"
-                         : L"Process loaded an UNSIGNED module from outside its install directory",
+                L"Unsigned module outside process directory",
+                L"Process loaded an unsigned external module; review required, injection is not confirmed",
                 L"PID " + std::to_wstring(pid) + L" | " + ns::Basename(path) + L" <- " + path,
                 path,
                 keyword ? NS_SEVERITY_HIGH : NS_SEVERITY_MEDIUM,
@@ -449,7 +448,7 @@ ModuleOutput RunProcessScanner(const RuleSet& rules) {
                 tempPath ? 68 : (daysOld <= 3 ? 62 : 48));
         }
 
-        if (IsMasqueradingName(exeLower) && fullLower.find(L"\\windows\\system32\\") == std::wstring::npos) {
+        if (!signedOk && IsMasqueradingName(exeLower) && fullLower.find(L"\\windows\\system32\\") == std::wstring::npos) {
             PushFinding(
                 out.findings,
                 L"Process",
@@ -461,7 +460,7 @@ ModuleOutput RunProcessScanner(const RuleSet& rules) {
                 93);
         }
 
-        if (ContainsCriticalToken(haystack)) {
+        if (!signedOk && ContainsCriticalToken(haystack)) {
             PushFinding(
                 out.findings,
                 L"Process",
@@ -471,7 +470,7 @@ ModuleOutput RunProcessScanner(const RuleSet& rules) {
                 fullPath,
                 userSpace || !signedOk ? NS_SEVERITY_HIGH : NS_SEVERITY_MEDIUM,
                 userSpace || !signedOk ? 88 : 70);
-        } else if (ContainsAnyNeedle(haystack, rules.strings) || ContainsSpecificPathNeedle(haystack, rules.paths)) {
+        } else if (!signedOk && (ContainsAnyNeedle(haystack, rules.strings) || ContainsSpecificPathNeedle(haystack, rules.paths))) {
             PushFinding(
                 out.findings,
                 L"Process",
@@ -483,7 +482,7 @@ ModuleOutput RunProcessScanner(const RuleSet& rules) {
                 !signedOk || userSpace ? 78 : 48);
         }
 
-        if (ContainsDevToolToken(haystack)) {
+        if (!signedOk && ContainsDevToolToken(haystack)) {
             PushFinding(
                 out.findings,
                 L"Process",
@@ -495,7 +494,7 @@ ModuleOutput RunProcessScanner(const RuleSet& rules) {
                 36);
         }
 
-        if (ContainsDangerousCommandToken(cmdLower) && (userSpace || !signedOk || tempPath)) {
+        if (!signedOk && ContainsDangerousCommandToken(cmdLower) && (userSpace || tempPath)) {
             PushFinding(
                 out.findings,
                 L"Process",
@@ -527,9 +526,9 @@ ModuleOutput RunProcessScanner(const RuleSet& rules) {
             const std::wstring hostDirLower = (slash == std::wstring::npos) ? std::wstring() : fullLower.substr(0, slash);
             DetectSuspiciousModules(ph, pid, hostDirLower, rules, out.findings, *modules);
             // Injection/manual-map scans are heavier and noisier on JIT apps; run
-            // them only on game-like processes (graphics modules present) — exactly
+            // them only on recognized game processes, rather than every graphics app — exactly
             // where game cheats like melonity live.
-            if (hasGraphics) {
+            if (IsGameProcessName(exeLower)) {
                 const auto modRanges = BuildModuleRanges(ph, *modules);
                 DetectInjectedThreads(ph, pid, modRanges, out.findings);
                 DetectUnbackedExecRegions(ph, pid, modRanges, out.findings);
@@ -537,7 +536,7 @@ ModuleOutput RunProcessScanner(const RuleSet& rules) {
             CloseHandle(ph);
         }
 
-        if (overlayPids.find(pid) != overlayPids.end() && hasGraphics && !trusted) {
+        if (!signedOk && overlayPids.find(pid) != overlayPids.end() && hasGraphics && !trusted) {
             PushFinding(
                 out.findings,
                 L"Process",

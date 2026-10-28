@@ -50,3 +50,18 @@ Native consumers must rebuild against the current `NsReport` definition.
 The scan summary also lists module failures, access limitations, and file roots
 or directories skipped by entry limits, depth limits, or directory exclusions.
 When Node.js is available, CTest also checks report status and chunk delivery.
+
+## Signature exemptions and vulnerable drivers
+
+Valid embedded Authenticode and installed catalog signatures exempt files from
+generic filename, path, process-command-line and autorun heuristics. A certificate
+merely being present is not sufficient: Windows trust verification must succeed.
+Memory checks remain active for recognized game processes, including signed games.
+
+Known vulnerable driver versions are an exception to the signature exemption.
+The checker compares full SHA-256 hashes against the embedded verified vulnerable
+samples from LOLDrivers. A name-only family match, when the image is unavailable,
+is a low-priority request to verify the version, not proof of vulnerability or cheating.
+The same database is used for files, loaded drivers and driver services.
+Refresh detection metadata with `python scripts/update_driver_indicators.py`;
+no driver binaries are downloaded. Source attribution is in `notices/LOLDrivers.md`.

@@ -523,6 +523,7 @@ void ScanGameProcessHandles(ns::ModuleOutput& out) {
             L"cheat", L"inject", L"overlay", L"aim", L"esp", L"mapper", L"hack"
         });
         const bool signedOk = !ownerPath.empty() && ns::VerifyFileSignature(ownerPath);
+        if (signedOk) continue;
 
         ns::PushFinding(
             out.findings,

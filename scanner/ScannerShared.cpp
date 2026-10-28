@@ -10,6 +10,7 @@
 #include <Softpub.h>
 #include <bcrypt.h>
 #include <wincrypt.h>
+#include <mscat.h>
 
 #include <algorithm>
 #include <array>
@@ -148,6 +149,59 @@ void PushFinding(
     findings.push_back(f);
 }
 
+static bool VerifyCatalogSignature(const std::wstring& path, const wchar_t* algorithm) {
+    HCATADMIN admin = nullptr;
+    if (!CryptCATAdminAcquireContext2(&admin, nullptr, algorithm, nullptr, 0)) return false;
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE,
+        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    bool valid = false;
+    if (file != INVALID_HANDLE_VALUE) {
+        DWORD size = 0;
+        CryptCATAdminCalcHashFromFileHandle2(admin, file, &size, nullptr, 0);
+        std::vector<BYTE> hash(size);
+        if (size && CryptCATAdminCalcHashFromFileHandle2(admin, file, &size, hash.data(), 0)) {
+            const wchar_t hex[] = L"0123456789ABCDEF";
+            std::wstring tag;
+            for (DWORD i = 0; i < size; ++i) {
+                tag += hex[hash[i] >> 4];
+                tag += hex[hash[i] & 15];
+            }
+            HCATINFO catalog = CryptCATAdminEnumCatalogFromHash(admin, hash.data(), size, 0, nullptr);
+            while (catalog) {
+                CATALOG_INFO info{};
+                info.cbStruct = sizeof(info);
+                if (CryptCATCatalogInfoFromContext(catalog, &info, 0)) {
+                    WINTRUST_CATALOG_INFO member{};
+                    member.cbStruct = sizeof(member);
+                    member.pcwszCatalogFilePath = info.wszCatalogFile;
+                    member.pcwszMemberTag = tag.c_str();
+                    member.pcwszMemberFilePath = path.c_str();
+                    member.hMemberFile = file;
+                    member.pbCalculatedFileHash = hash.data();
+                    member.cbCalculatedFileHash = size;
+                    member.hCatAdmin = admin;
+                    WINTRUST_DATA trust{};
+                    trust.cbStruct = sizeof(trust);
+                    trust.dwUIChoice = WTD_UI_NONE;
+                    trust.dwUnionChoice = WTD_CHOICE_CATALOG;
+                    trust.pCatalog = &member;
+                    trust.dwStateAction = WTD_STATEACTION_VERIFY;
+                    trust.dwProvFlags = WTD_CACHE_ONLY_URL_RETRIEVAL;
+                    GUID policy = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+                    valid = WinVerifyTrust(nullptr, &policy, &trust) == ERROR_SUCCESS;
+                    trust.dwStateAction = WTD_STATEACTION_CLOSE;
+                    WinVerifyTrust(nullptr, &policy, &trust);
+                }
+                if (valid) { CryptCATAdminReleaseCatalogContext(admin, catalog, 0); break; }
+                catalog = CryptCATAdminEnumCatalogFromHash(admin, hash.data(), size, 0, &catalog);
+            }
+        }
+        CloseHandle(file);
+    }
+    CryptCATAdminReleaseContext(admin, 0);
+    return valid;
+}
+
 bool VerifyFileSignature(const std::wstring& path) {
     if (path.empty() || !PathFileExistsW(path.c_str())) {
         return false;
@@ -165,13 +219,15 @@ bool VerifyFileSignature(const std::wstring& path) {
     trustData.dwUnionChoice = WTD_CHOICE_FILE;
     trustData.pFile = &fileInfo;
     trustData.dwStateAction = WTD_STATEACTION_VERIFY;
-    trustData.dwProvFlags = WTD_SAFER_FLAG;
+    trustData.dwProvFlags = WTD_SAFER_FLAG | WTD_CACHE_ONLY_URL_RETRIEVAL;
 
     LONG status = WinVerifyTrust(nullptr, &policyGuid, &trustData);
     trustData.dwStateAction = WTD_STATEACTION_CLOSE;
     WinVerifyTrust(nullptr, &policyGuid, &trustData);
 
-    return status == ERROR_SUCCESS;
+    if (status == ERROR_SUCCESS) return true;
+    return VerifyCatalogSignature(path, BCRYPT_SHA256_ALGORITHM) ||
+           VerifyCatalogSignature(path, BCRYPT_SHA1_ALGORITHM);
 }
 
 SignerInfo GetFileSignerInfo(const std::wstring& path) {

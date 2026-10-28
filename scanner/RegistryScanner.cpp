@@ -79,6 +79,7 @@ void AnalyzeAutorunCommand(const std::wstring& source, const std::wstring& value
     const bool temp = ns::IsTempPath(lowerPath) || ns::IsTempPath(lowerFull);
     const bool suspicious = LooksSuspiciousCommand(lowerFull, rules);
 
+    if (ns::VerifyFileSignature(trimmed)) return;
     if (userSpace || suspicious) {
         int severity = (temp || lowerFull.find(L"encodedcommand") != std::wstring::npos ||
                         lowerFull.find(L"frombase64string") != std::wstring::npos)
