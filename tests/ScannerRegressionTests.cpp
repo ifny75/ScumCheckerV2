@@ -1,6 +1,9 @@
 #include "FileScanner.h"
 #include "RiskAnalyzer.h"
+#include "ProcessModuleEnumerator.h"
+#include <Psapi.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -74,6 +77,54 @@ void TestRiskCorrelationAndDeduplication() {
             "Independent findings no longer correlate");
     }
 }
+
+void TestGrowingModuleSnapshot() {
+    int calls = 0;
+    const auto modules = ns::ReadProcessModuleSnapshot([&](HMODULE* buffer, DWORD bytes, DWORD* needed) {
+        ++calls;
+        // Grow again after the first size query, exceeding both old arrays.
+        const size_t count = calls == 1 ? 2048 : 4096;
+        *needed = static_cast<DWORD>(count * sizeof(HMODULE));
+        const size_t written = (std::min)(count, bytes / sizeof(HMODULE));
+        for (size_t i = 0; i < written; ++i) buffer[i] = reinterpret_cast<HMODULE>(i + 1);
+        return TRUE;
+    });
+    Require(calls == 3, "Module enumeration did not retry after growth");
+    Require(modules && modules->size() == 4096, "Module snapshot was truncated");
+    for (size_t i = 0; i < modules->size(); ++i) {
+        Require((*modules)[i] == reinterpret_cast<HMODULE>(i + 1), "Invalid module in snapshot");
+    }
+}
+
+void TestIncompleteModuleSnapshots() {
+    int calls = 0;
+    const auto failed = ns::ReadProcessModuleSnapshot([&](HMODULE*, DWORD bytes, DWORD* needed) {
+        *needed = bytes + static_cast<DWORD>(sizeof(HMODULE));
+        return ++calls == 1 ? TRUE : FALSE;
+    });
+    Require(!failed && calls == 2, "Enumeration failure exposed an incomplete snapshot");
+    calls = 0;
+    const auto unstable = ns::ReadProcessModuleSnapshot([&](HMODULE*, DWORD bytes, DWORD* needed) {
+        ++calls;
+        *needed = bytes + static_cast<DWORD>(sizeof(HMODULE));
+        return TRUE;
+    });
+    Require(!unstable && calls == 8, "Unstable enumeration was not bounded");
+    const auto empty = ns::ReadProcessModuleSnapshot([](HMODULE*, DWORD, DWORD* needed) {
+        *needed = 0;
+        return TRUE;
+    });
+    Require(empty && empty->empty(), "Empty snapshot was treated as an error");
+}
+
+void TestLiveModuleSnapshot() {
+    const auto modules = ns::ReadProcessModuleSnapshot([](HMODULE* buffer, DWORD bytes, DWORD* needed) {
+        return EnumProcessModulesEx(GetCurrentProcess(), buffer, bytes, needed, LIST_MODULES_ALL);
+    });
+    Require(modules && !modules->empty(), "Could not enumerate test process modules");
+    Require(std::find(modules->begin(), modules->end(), GetModuleHandleW(nullptr)) != modules->end(),
+        "Live module snapshot omitted the executable");
+}
 }
 
 int main() {
@@ -81,6 +132,9 @@ int main() {
         TestRepeatedFileScans();
         TestRiskDoesNotDependOnDisplayText();
         TestRiskCorrelationAndDeduplication();
+        TestGrowingModuleSnapshot();
+        TestIncompleteModuleSnapshots();
+        TestLiveModuleSnapshot();
         std::cout << "Scanner regressions passed\n";
         return 0;
     } catch (const std::exception& ex) {

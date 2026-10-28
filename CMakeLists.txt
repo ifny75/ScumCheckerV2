@@ -33,6 +33,7 @@ add_library(scum_scanner STATIC
     scanner/FileScanner.h
     scanner/ProcessScanner.cpp
     scanner/ProcessScanner.h
+    scanner/ProcessModuleEnumerator.h
     scanner/DriverScanner.cpp
     scanner/DriverScanner.h
     scanner/RegistryScanner.cpp

@@ -3,6 +3,7 @@
 #endif
 
 #include "ProcessScanner.h"
+#include "ProcessModuleEnumerator.h"
 
 #include <Windows.h>
 #include <Psapi.h>
@@ -175,17 +176,10 @@ std::wstring ReadRemoteCommandLine(HANDLE hProc) {
     return out;
 }
 
-bool ProcessHasGraphicsModules(HANDLE hProc) {
-    HMODULE modules[1024]{};
-    DWORD cbNeeded = 0;
-    if (!EnumProcessModulesEx(hProc, modules, sizeof(modules), &cbNeeded, LIST_MODULES_ALL)) {
-        return false;
-    }
-
-    const size_t count = cbNeeded / sizeof(HMODULE);
-    for (size_t i = 0; i < count; ++i) {
+bool ProcessHasGraphicsModules(HANDLE hProc, const std::vector<HMODULE>& modules) {
+    for (const auto module : modules) {
         wchar_t modName[MAX_PATH]{};
-        if (!GetModuleBaseNameW(hProc, modules[i], modName, static_cast<DWORD>(std::size(modName)))) {
+        if (!GetModuleBaseNameW(hProc, module, modName, static_cast<DWORD>(std::size(modName)))) {
             continue;
         }
 
@@ -209,17 +203,11 @@ std::wstring DirOf(const std::wstring& path) {
 // are unsigned or keyword-matched (legit signed overlays like Steam/Discord are
 // left alone). Does NOT catch manual-mapped code — see DetectManualMappedRegions.
 void DetectSuspiciousModules(HANDLE hProc, DWORD pid, const std::wstring& hostDirLower,
-                             const ns::RuleSet& rules, std::vector<NsFinding>& findings) {
-    HMODULE modules[3072]{};
-    DWORD cbNeeded = 0;
-    if (!EnumProcessModulesEx(hProc, modules, sizeof(modules), &cbNeeded, LIST_MODULES_ALL)) {
-        return;
-    }
-
-    const size_t count = cbNeeded / sizeof(HMODULE);
-    for (size_t i = 0; i < count; ++i) {
+                             const ns::RuleSet& rules, std::vector<NsFinding>& findings,
+                             const std::vector<HMODULE>& modules) {
+    for (const auto module : modules) {
         wchar_t modPath[2048]{};
-        if (!GetModuleFileNameExW(hProc, modules[i], modPath, static_cast<DWORD>(std::size(modPath)))) {
+        if (!GetModuleFileNameExW(hProc, module, modPath, static_cast<DWORD>(std::size(modPath)))) {
             continue;
         }
 
@@ -255,19 +243,14 @@ void DetectSuspiciousModules(HANDLE hProc, DWORD pid, const std::wstring& hostDi
 
 struct ModRange { uintptr_t lo; uintptr_t hi; };
 
-std::vector<ModRange> BuildModuleRanges(HANDLE hProc) {
+std::vector<ModRange> BuildModuleRanges(HANDLE hProc, const std::vector<HMODULE>& modules) {
     std::vector<ModRange> ranges;
-    HMODULE mods[3072]{};
-    DWORD cb = 0;
-    if (EnumProcessModulesEx(hProc, mods, sizeof(mods), &cb, LIST_MODULES_ALL)) {
-        const size_t n = cb / sizeof(HMODULE);
-        ranges.reserve(n);
-        for (size_t i = 0; i < n; ++i) {
-            MODULEINFO mi{};
-            if (GetModuleInformation(hProc, mods[i], &mi, sizeof(mi))) {
-                const auto base = reinterpret_cast<uintptr_t>(mi.lpBaseOfDll);
-                ranges.push_back({base, base + mi.SizeOfImage});
-            }
+    ranges.reserve(modules.size());
+    for (const auto module : modules) {
+        MODULEINFO mi{};
+        if (GetModuleInformation(hProc, module, &mi, sizeof(mi))) {
+            const auto base = reinterpret_cast<uintptr_t>(mi.lpBaseOfDll);
+            ranges.push_back({base, base + mi.SizeOfImage});
         }
     }
     return ranges;
@@ -531,15 +514,23 @@ ModuleOutput RunProcessScanner(const RuleSet& rules) {
 
         bool hasGraphics = false;
         if (ph) {
-            hasGraphics = ProcessHasGraphicsModules(ph);
+            const auto modules = ReadProcessModuleSnapshot([ph](HMODULE* buffer, DWORD bytes, DWORD* needed) {
+                return EnumProcessModulesEx(ph, buffer, bytes, needed, LIST_MODULES_ALL);
+            });
+            if (!modules) {
+                out.errors++;
+                CloseHandle(ph);
+                continue;
+            }
+            hasGraphics = ProcessHasGraphicsModules(ph, *modules);
             const size_t slash = fullLower.find_last_of(L"\\/");
             const std::wstring hostDirLower = (slash == std::wstring::npos) ? std::wstring() : fullLower.substr(0, slash);
-            DetectSuspiciousModules(ph, pid, hostDirLower, rules, out.findings);
+            DetectSuspiciousModules(ph, pid, hostDirLower, rules, out.findings, *modules);
             // Injection/manual-map scans are heavier and noisier on JIT apps; run
             // them only on game-like processes (graphics modules present) — exactly
             // where game cheats like melonity live.
             if (hasGraphics) {
-                const auto modRanges = BuildModuleRanges(ph);
+                const auto modRanges = BuildModuleRanges(ph, *modules);
                 DetectInjectedThreads(ph, pid, modRanges, out.findings);
                 DetectUnbackedExecRegions(ph, pid, modRanges, out.findings);
             }
