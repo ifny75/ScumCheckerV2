@@ -63,6 +63,16 @@ target_compile_definitions(scum_scanner PRIVATE
 target_compile_options(scum_scanner PRIVATE /EHsc /utf-8)
 target_link_libraries(scum_scanner PRIVATE advapi32 psapi wintrust shlwapi bcrypt crypt32 setupapi iphlpapi ws2_32)
 
+include(CTest)
+if (BUILD_TESTING)
+    add_executable(scanner_regression_tests tests/ScannerRegressionTests.cpp)
+    target_include_directories(scanner_regression_tests PRIVATE scanner)
+    target_compile_definitions(scanner_regression_tests PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN)
+    target_compile_options(scanner_regression_tests PRIVATE /EHsc /utf-8)
+    target_link_libraries(scanner_regression_tests PRIVATE scum_scanner)
+    add_test(NAME scanner_regressions COMMAND scanner_regression_tests)
+endif()
+
 # --- Embed the web UI (html/css/js/svg/png/...) into the executable ------------
 set(WEB_DIR "${CMAKE_SOURCE_DIR}/web")
 set(GEN_DIR "${CMAKE_BINARY_DIR}/generated")

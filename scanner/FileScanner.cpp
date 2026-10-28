@@ -12,37 +12,19 @@
 #include <filesystem>
 #include <mutex>
 #include <algorithm>
-#include <unordered_map>
 #include <unordered_set>
 
 namespace {
 
-std::mutex g_cacheMutex;
-std::unordered_map<std::wstring, unsigned long long> g_fileFingerprintCache;
+struct ScanState {
+    std::mutex mutex;
+    std::unordered_set<std::wstring> visitedFiles;
+};
 
 struct RootSpec {
     std::wstring path;
     int maxDepth = 5;
 };
-
-unsigned long long ReadFingerprint(const std::wstring& path, bool* ok = nullptr) {
-    WIN32_FILE_ATTRIBUTE_DATA fad{};
-    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &fad)) {
-        if (ok) *ok = false;
-        return 0;
-    }
-
-    ULARGE_INTEGER sz{};
-    sz.HighPart = fad.nFileSizeHigh;
-    sz.LowPart = fad.nFileSizeLow;
-
-    ULARGE_INTEGER lw{};
-    lw.HighPart = fad.ftLastWriteTime.dwHighDateTime;
-    lw.LowPart = fad.ftLastWriteTime.dwLowDateTime;
-
-    if (ok) *ok = true;
-    return (sz.QuadPart * 1315423911ull) ^ lw.QuadPart;
-}
 
 int DaysSinceCreation(const std::wstring& path) {
     WIN32_FILE_ATTRIBUTE_DATA fad{};
@@ -189,7 +171,7 @@ std::vector<RootSpec> BuildRoots() {
     return unique;
 }
 
-void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& out) {
+void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& out, ScanState& state) {
     std::error_code ec;
     std::filesystem::recursive_directory_iterator it(
         std::filesystem::path(root.path),
@@ -258,18 +240,13 @@ void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& 
 
         if (!IsInterestingExtension(extLower)) continue;
 
-        out.files_checked++;
-
-        bool fpOk = false;
-        const auto fingerprint = ReadFingerprint(path, &fpOk);
-        if (fpOk) {
-            std::lock_guard<std::mutex> lock(g_cacheMutex);
-            auto found = g_fileFingerprintCache.find(pathLower);
-            if (found != g_fileFingerprintCache.end() && found->second == fingerprint) {
-                continue;
-            }
-            g_fileFingerprintCache[pathLower] = fingerprint;
+        // Only deduplicate overlapping roots within this scan. Every new scan
+        // must evaluate unchanged files again, including against changed rules.
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            if (!state.visitedFiles.insert(pathLower).second) continue;
         }
+        out.files_checked++;
 
         // ---------------------------------------------------------------
         // Combination model. The scanner only walks APPDATA/LOCALAPPDATA/TEMP,
@@ -421,8 +398,14 @@ void ScanRoot(const RootSpec& root, const ns::RuleSet& rules, ns::ModuleOutput& 
 namespace ns {
 
 ModuleOutput RunFileScanner(const RuleSet& rules) {
+    return RunFileScanner(rules, {});
+}
+
+ModuleOutput RunFileScanner(const RuleSet& rules, const std::vector<std::wstring>& selectedRoots) {
     ModuleOutput merged;
-    auto roots = BuildRoots();
+    auto roots = selectedRoots.empty() ? BuildRoots() : std::vector<RootSpec>{};
+    for (const auto& path : selectedRoots) AddRoot(roots, path, 5);
+    ScanState state;
     if (roots.empty()) {
         return merged;
     }
@@ -431,10 +414,10 @@ ModuleOutput RunFileScanner(const RuleSet& rules) {
     tasks.reserve(roots.size());
 
     for (const auto& r : roots) {
-        tasks.push_back(std::async(std::launch::async, [r, &rules]() {
+        tasks.push_back(std::async(std::launch::async, [r, &rules, &state]() {
             ModuleOutput mo;
             try {
-                ScanRoot(r, rules, mo);
+                ScanRoot(r, rules, mo, state);
             } catch (...) {
                 mo.errors++;
             }
